@@ -1,9 +1,14 @@
-
 import { AppLayout } from "@/components/app-layout";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { ShoppingBag, Briefcase, Calendar, Star, ArrowRight } from "lucide-react";
+import {
+  ShoppingBag,
+  Briefcase,
+  Calendar,
+  Star,
+  ArrowRight,
+} from "lucide-react";
 import { Link } from "react-router-dom";
 import { mockEvents } from "@/models/Event";
 import { mockListings } from "@/models/Marketplace";
@@ -11,7 +16,7 @@ import { mockServices } from "@/models/Service";
 
 export default function Home() {
   const { currentUser, isAuthenticated } = useAuth();
-  
+
   // Get most recent items for preview sections
   const featuredEvents = mockEvents.slice(0, 2);
   const featuredListings = mockListings.slice(0, 3);
@@ -23,13 +28,13 @@ export default function Home() {
         {/* Welcome Hero */}
         <section className="bg-gradient-to-r from-grambling-black to-grambling-black/90 text-white rounded-lg p-6 shadow-lg">
           <h1 className="text-2xl font-bold mb-2">
-            {isAuthenticated 
-              ? `Welcome back, ${currentUser?.name?.split(' ')[0]}!` 
+            {isAuthenticated
+              ? `Welcome back, ${currentUser?.name?.split(" ")[0]}!`
               : "Welcome to Tiger Life"}
           </h1>
           <p className="mb-4 text-white/80">
-            {isAuthenticated 
-              ? "Your one-stop platform for campus life at Grambling State." 
+            {isAuthenticated
+              ? "Your one-stop platform for campus life at Grambling State."
               : "Connect with the Grambling community and access everything you need."}
           </p>
           {!isAuthenticated && (
@@ -40,7 +45,10 @@ export default function Home() {
                 </Button>
               </Link>
               <Link to="/register">
-                <Button variant="outline" className="text-white border-white hover:bg-white/10">
+                <Button
+                  variant="outline"
+                  className="text-black border-white hover:bg-white/10"
+                >
                   Create Account
                 </Button>
               </Link>
@@ -80,7 +88,10 @@ export default function Home() {
         <section>
           <div className="flex justify-between items-center mb-3">
             <h2 className="text-lg font-semibold">Upcoming Events</h2>
-            <Link to="/events" className="text-grambling-gold text-sm flex items-center">
+            <Link
+              to="/events"
+              className="text-grambling-gold text-sm flex items-center"
+            >
               View all <ArrowRight className="h-4 w-4 ml-1" />
             </Link>
           </div>
@@ -90,18 +101,28 @@ export default function Home() {
                 <Card className="tiger-card">
                   <CardContent className="p-0">
                     <div className="aspect-[16/9] relative">
-                      <img 
-                        src={event.image || "https://via.placeholder.com/600x400?text=Event"} 
+                      <img
+                        src={
+                          event.image ||
+                          "https://via.placeholder.com/600x400?text=Event"
+                        }
                         alt={event.title}
                         className="w-full h-full object-cover rounded-t-lg"
                       />
                       <div className="absolute bottom-0 left-0 bg-grambling-black/70 text-white px-3 py-1 rounded-tr-lg text-xs">
-                        {new Date(event.startDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                        {new Date(event.startDate).toLocaleDateString("en-US", {
+                          month: "short",
+                          day: "numeric",
+                        })}
                       </div>
                     </div>
                     <div className="p-4">
-                      <h3 className="font-semibold line-clamp-1">{event.title}</h3>
-                      <p className="text-xs text-gray-500 mt-1">{event.location}</p>
+                      <h3 className="font-semibold line-clamp-1">
+                        {event.title}
+                      </h3>
+                      <p className="text-xs text-gray-500 mt-1">
+                        {event.location}
+                      </p>
                       <p className="text-xs text-gray-500 mt-1">
                         {event.attendeeCount} attending
                       </p>
@@ -117,7 +138,10 @@ export default function Home() {
         <section>
           <div className="flex justify-between items-center mb-3">
             <h2 className="text-lg font-semibold">Recent Listings</h2>
-            <Link to="/marketplace" className="text-grambling-gold text-sm flex items-center">
+            <Link
+              to="/marketplace"
+              className="text-grambling-gold text-sm flex items-center"
+            >
               View all <ArrowRight className="h-4 w-4 ml-1" />
             </Link>
           </div>
@@ -127,8 +151,11 @@ export default function Home() {
                 <Card className="tiger-card h-full">
                   <CardContent className="p-0">
                     <div className="aspect-square relative">
-                      <img 
-                        src={item.images[0] || "https://via.placeholder.com/300x300?text=Item"} 
+                      <img
+                        src={
+                          item.images[0] ||
+                          "https://via.placeholder.com/300x300?text=Item"
+                        }
                         alt={item.title}
                         className="w-full h-full object-cover rounded-t-lg"
                       />
@@ -137,8 +164,12 @@ export default function Home() {
                       </div>
                     </div>
                     <div className="p-3">
-                      <h3 className="font-medium text-sm line-clamp-1">{item.title}</h3>
-                      <p className="text-xs text-gray-500 mt-1">{item.condition}</p>
+                      <h3 className="font-medium text-sm line-clamp-1">
+                        {item.title}
+                      </h3>
+                      <p className="text-xs text-gray-500 mt-1">
+                        {item.condition}
+                      </p>
                     </div>
                   </CardContent>
                 </Card>
@@ -151,7 +182,10 @@ export default function Home() {
         <section>
           <div className="flex justify-between items-center mb-3">
             <h2 className="text-lg font-semibold">Popular Services</h2>
-            <Link to="/services" className="text-grambling-gold text-sm flex items-center">
+            <Link
+              to="/services"
+              className="text-grambling-gold text-sm flex items-center"
+            >
               View all <ArrowRight className="h-4 w-4 ml-1" />
             </Link>
           </div>
@@ -176,7 +210,8 @@ export default function Home() {
                       </div>
                       <div className="text-right">
                         <div className="font-semibold">
-                          ${service.rate}{service.rateType === "hourly" ? "/hr" : ""}
+                          ${service.rate}
+                          {service.rateType === "hourly" ? "/hr" : ""}
                         </div>
                         <div className="text-xs text-gray-500 mt-1">
                           {service.category}

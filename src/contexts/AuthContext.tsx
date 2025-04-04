@@ -1,13 +1,24 @@
-
-import React, { createContext, useState, useContext, useEffect, ReactNode } from "react";
+import React, {
+  createContext,
+  useState,
+  useContext,
+  useEffect,
+  ReactNode,
+} from "react";
 import { User, mockUsers } from "@/models/User";
 import { useToast } from "@/hooks/use-toast";
+import { supabaseCon } from "../db_api/connection.js";
 
 interface AuthContextType {
   currentUser: User | null;
   isAuthenticated: boolean;
   login: (studentId: string, password: string) => Promise<boolean>;
-  register: (name: string, email: string, studentId: string, password: string) => Promise<boolean>;
+  register: (
+    name: string,
+    email: string,
+    studentId: string,
+    password: string
+  ) => Promise<boolean>;
   logout: () => void;
   verifyAccount: () => Promise<boolean>;
 }
@@ -34,14 +45,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  const login = async (studentId: string, password: string): Promise<boolean> => {
+  const login = async (
+    studentId: string,
+    password: string
+  ): Promise<boolean> => {
     // Simulate API call
     try {
       // For demo purposes, we'll just use mock data
       // In a real app, this would call your authentication API
-      const user = mockUsers.find(u => u.studentId === studentId);
-      
-      if (user && password === "password") { // In a real app, use proper password validation
+      const user = mockUsers.find((u) => u.studentId === studentId);
+
+      if (user && password === "password") {
+        // In a real app, use proper password validation
         setCurrentUser(user);
         setIsAuthenticated(true);
         localStorage.setItem("tigerUser", JSON.stringify(user));
@@ -78,14 +93,33 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // Simulate API call
     try {
       // Check if user already exists
-      const existingUser = mockUsers.find(
-        (u) => u.studentId === studentId || u.email === email
-      );
+      const existingUser = await supabaseCon.userExists(studentId);
 
       if (existingUser) {
         toast({
           title: "Registration Failed",
           description: "Student ID or email already in use",
+          variant: "destructive",
+        });
+        return false;
+      }
+
+      // Simple split to split the full name into first and last names
+      const parts = name.split(/\s+/);
+
+      // Call SupabaseDbConnection's signup method
+      const signupResult = await supabaseCon.signup(
+        parts[0],
+        parts[1],
+        email,
+        studentId,
+        password
+      );
+
+      if (!signupResult.success) {
+        toast({
+          title: "Registration Failed",
+          description: signupResult.error || "An unexpected error occurred.",
           variant: "destructive",
         });
         return false;
@@ -102,19 +136,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         joinedAt: new Date(),
       };
 
-      // In a real app, you would save this to a database
-      mockUsers.push(newUser);
-      
       // Auto-login the new user
       setCurrentUser(newUser);
       setIsAuthenticated(true);
       localStorage.setItem("tigerUser", JSON.stringify(newUser));
-      
+
       toast({
         title: "Registration Successful",
-        description: "Your account has been created. Please verify your student ID.",
+        description:
+          "Your account has been created. Please verify your student ID.",
       });
-      
+
       return true;
     } catch (error) {
       console.error("Registration error", error);
@@ -131,17 +163,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // Simulate API call for verification
     try {
       if (!currentUser) return false;
-      
+
       // In a real app, this would call your verification API
       const updatedUser = { ...currentUser, verified: true };
       setCurrentUser(updatedUser);
       localStorage.setItem("tigerUser", JSON.stringify(updatedUser));
-      
+
       toast({
         title: "Verification Successful",
         description: "Your student ID has been verified!",
       });
-      
+
       return true;
     } catch (error) {
       console.error("Verification error", error);
@@ -172,7 +204,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         login,
         register,
         logout,
-        verifyAccount
+        verifyAccount,
       }}
     >
       {children}
