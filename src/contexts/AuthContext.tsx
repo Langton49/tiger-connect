@@ -5,7 +5,7 @@ import React, {
   useEffect,
   ReactNode,
 } from "react";
-import { User, mockUsers } from "@/models/User";
+import { User } from "@/models/User";
 import { useToast } from "@/hooks/use-toast";
 import { supabaseCon } from "../db_api/connection.js";
 
@@ -46,29 +46,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const login = async (
-    studentId: string,
+    email: string, // change to email for login because there was no way to securely login without exposing the db to the public
     password: string
   ): Promise<boolean> => {
     // Simulate API call
     try {
-      // For demo purposes, we'll just use mock data
-      // In a real app, this would call your authentication API
-      const user = mockUsers.find((u) => u.studentId === studentId);
+      const user = await supabaseCon.login(email, password); // Returns a user object with success and data properties
 
-      if (user && password === "password") {
-        // In a real app, use proper password validation
-        setCurrentUser(user);
+      // If the login was successful, set the user in state and localStorage
+      if (user.success) {
+        setCurrentUser(user.data);
         setIsAuthenticated(true);
-        localStorage.setItem("tigerUser", JSON.stringify(user));
+        localStorage.setItem("tigerUser", JSON.stringify(user.data));
         toast({
           title: "Login Successful",
-          description: `Welcome back, ${user.name}!`,
+          description: `Welcome back, ${user.data.first_name}!`,
         });
         return true;
       } else {
         toast({
           title: "Login Failed",
-          description: "Invalid student ID or password",
+          description: "Invalid email or password",
           variant: "destructive",
         });
         return false;
@@ -95,7 +93,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // Check if user already exists
       const existingUser = await supabaseCon.userExists(studentId);
 
-      if (existingUser) {
+      // If an error occurred while checking for existing user, show error message
+      if (existingUser.error) {
+        toast({
+          title: "Registration Failed",
+          description: "Please try again later",
+          variant: "destructive",
+        });
+        return false;
+      }
+
+      // If user already exists, message stating that the user already exists
+      if (existingUser.exists) {
         toast({
           title: "Registration Failed",
           description: "Student ID or email already in use",
@@ -127,13 +136,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       // Create new user
       const newUser: User = {
-        id: `user-${Date.now()}`,
-        name,
-        email,
-        studentId,
-        verified: false,
-        rating: 0,
-        joinedAt: new Date(),
+        user_id: signupResult.data.user_id,
+        first_name: signupResult.data.first_name,
+        last_name: signupResult.data.last_name,
+        email: signupResult.data.email,
+        g_number: signupResult.data.g_number,
+        rating: null,
+        verified: signupResult.data.verified,
+        joinedAt: signupResult.data.joinedAt,
       };
 
       // Auto-login the new user
@@ -186,7 +196,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const logout = () => {
+  const logout = async () => {
+    const logoutResult = await supabaseCon.logout();
+    if (!logoutResult.success) {
+      toast({
+        title: "Logout Error",
+        description: "An unexpected error occurred. Please try again.",
+        variant: "destructive",
+      });
+      return;
+    }
     setCurrentUser(null);
     setIsAuthenticated(false);
     localStorage.removeItem("tigerUser");

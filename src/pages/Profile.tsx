@@ -1,20 +1,19 @@
-
 import { AppLayout } from "@/components/app-layout";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { useNavigate, Link } from "react-router-dom";
-import { 
-  Calendar, 
-  ShoppingBag, 
-  Briefcase, 
-  MessageSquare, 
-  Settings, 
-  Star, 
-  LogOut, 
-  VerifiedIcon, 
-  User, 
-  Clock 
+import {
+  Calendar,
+  ShoppingBag,
+  Briefcase,
+  MessageSquare,
+  Settings,
+  Star,
+  LogOut,
+  VerifiedIcon,
+  User,
+  Clock,
 } from "lucide-react";
 import { mockListings } from "@/models/Marketplace";
 import { mockServices } from "@/models/Service";
@@ -30,8 +29,12 @@ export default function Profile() {
   }
 
   // Filter listings and services for this user
-  const userListings = mockListings.filter(item => item.sellerId === currentUser?.id);
-  const userServices = mockServices.filter(service => service.providerId === currentUser?.id);
+  const userListings = mockListings.filter(
+    (item) => item.sellerId === currentUser?.user_id
+  );
+  const userServices = mockServices.filter(
+    (service) => service.providerId === currentUser?.user_id
+  );
 
   const handleLogout = () => {
     logout();
@@ -41,17 +44,17 @@ export default function Profile() {
   // Calculate account age
   const accountAge = () => {
     if (!currentUser?.joinedAt) return "N/A";
-    
+
     const now = new Date();
     const joinDate = new Date(currentUser.joinedAt);
     const diffTime = Math.abs(now.getTime() - joinDate.getTime());
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-    
+
     if (diffDays < 30) {
       return `${diffDays} days`;
     } else {
       const diffMonths = Math.floor(diffDays / 30);
-      return `${diffMonths} ${diffMonths === 1 ? 'month' : 'months'}`;
+      return `${diffMonths} ${diffMonths === 1 ? "month" : "months"}`;
     }
   };
 
@@ -65,9 +68,9 @@ export default function Profile() {
               <div className="relative">
                 <div className="w-24 h-24 rounded-full bg-grambling-gray flex items-center justify-center overflow-hidden">
                   {currentUser?.avatar ? (
-                    <img 
-                      src={currentUser.avatar} 
-                      alt={currentUser.name} 
+                    <img
+                      src={currentUser.avatar}
+                      alt={currentUser.first_name + " " + currentUser.last_name}
                       className="w-full h-full object-cover"
                     />
                   ) : (
@@ -80,10 +83,12 @@ export default function Profile() {
                   </div>
                 )}
               </div>
-              
+
               <div className="text-center sm:text-left flex-1">
                 <div className="flex items-center justify-center sm:justify-start">
-                  <h1 className="text-xl font-semibold">{currentUser?.name}</h1>
+                  <h1 className="text-xl font-semibold">
+                    {currentUser?.first_name + " " + currentUser?.last_name}
+                  </h1>
                   {currentUser?.verified && (
                     <span className="ml-2 bg-grambling-gold/20 text-grambling-black text-xs px-2 py-1 rounded-full flex items-center">
                       <VerifiedIcon className="h-3 w-3 mr-1" />
@@ -91,35 +96,35 @@ export default function Profile() {
                     </span>
                   )}
                 </div>
-                
+
                 <div className="flex items-center justify-center sm:justify-start mt-1">
                   <Star className="h-4 w-4 text-grambling-gold fill-grambling-gold" />
                   <span className="text-sm ml-1">
                     {currentUser?.rating || "No ratings yet"}
                   </span>
                 </div>
-                
+
                 <div className="flex items-center justify-center sm:justify-start text-sm text-gray-500 mt-1">
                   <Clock className="h-4 w-4 mr-1" />
                   Member for {accountAge()}
                 </div>
-                
+
                 {currentUser?.bio && (
                   <p className="mt-2 text-sm text-gray-600">
                     {currentUser.bio}
                   </p>
                 )}
               </div>
-              
+
               <div className="flex flex-col gap-2">
                 <Link to="/profile/edit">
                   <Button variant="outline" size="sm" className="w-full">
                     Edit Profile
                   </Button>
                 </Link>
-                <Button 
-                  variant="outline" 
-                  size="sm" 
+                <Button
+                  variant="outline"
+                  size="sm"
                   onClick={handleLogout}
                   className="text-red-500 hover:text-red-600 hover:bg-red-50 w-full"
                 >
@@ -130,7 +135,7 @@ export default function Profile() {
             </div>
           </CardContent>
         </Card>
-        
+
         {/* Quick Actions */}
         <div className="grid grid-cols-2 gap-3">
           <Link to="/messages">
@@ -150,7 +155,7 @@ export default function Profile() {
             </Card>
           </Link>
         </div>
-        
+
         {/* My Listings */}
         <section>
           <div className="flex justify-between items-center mb-3">
@@ -159,7 +164,7 @@ export default function Profile() {
               + Add New
             </Link>
           </div>
-          
+
           {userListings.length > 0 ? (
             <div className="grid grid-cols-2 gap-3">
               {userListings.map((item) => (
@@ -167,8 +172,11 @@ export default function Profile() {
                   <Card className="tiger-card h-full">
                     <CardContent className="p-0">
                       <div className="aspect-square relative">
-                        <img 
-                          src={item.images[0] || "https://via.placeholder.com/300x300?text=Item"} 
+                        <img
+                          src={
+                            item.images[0] ||
+                            "https://via.placeholder.com/300x300?text=Item"
+                          }
                           alt={item.title}
                           className="w-full h-full object-cover rounded-t-lg"
                         />
@@ -180,8 +188,12 @@ export default function Profile() {
                         </div>
                       </div>
                       <div className="p-3">
-                        <h3 className="font-medium text-sm line-clamp-1">{item.title}</h3>
-                        <p className="text-xs text-gray-500 mt-1">{item.category}</p>
+                        <h3 className="font-medium text-sm line-clamp-1">
+                          {item.title}
+                        </h3>
+                        <p className="text-xs text-gray-500 mt-1">
+                          {item.category}
+                        </p>
                       </div>
                     </CardContent>
                   </Card>
@@ -192,8 +204,12 @@ export default function Profile() {
             <Card className="tiger-card bg-gray-50">
               <CardContent className="p-8 text-center">
                 <ShoppingBag className="h-12 w-12 text-gray-300 mx-auto mb-3" />
-                <h3 className="text-lg font-medium text-gray-500 mb-2">No Listings Yet</h3>
-                <p className="text-sm text-gray-500 mb-4">Start selling items to the Grambling community</p>
+                <h3 className="text-lg font-medium text-gray-500 mb-2">
+                  No Listings Yet
+                </h3>
+                <p className="text-sm text-gray-500 mb-4">
+                  Start selling items to the Grambling community
+                </p>
                 <Link to="/marketplace/new">
                   <Button className="bg-grambling-gold hover:bg-grambling-gold/90 text-grambling-black">
                     Create Listing
@@ -203,7 +219,7 @@ export default function Profile() {
             </Card>
           )}
         </section>
-        
+
         {/* My Services */}
         <section>
           <div className="flex justify-between items-center mb-3">
@@ -212,7 +228,7 @@ export default function Profile() {
               + Add New
             </Link>
           </div>
-          
+
           {userServices.length > 0 ? (
             <div className="space-y-3">
               {userServices.map((service) => (
@@ -227,7 +243,9 @@ export default function Profile() {
                           </p>
                           <div className="flex items-center mt-2">
                             <Star className="h-4 w-4 text-grambling-gold fill-grambling-gold" />
-                            <span className="text-sm ml-1">{service.rating}</span>
+                            <span className="text-sm ml-1">
+                              {service.rating}
+                            </span>
                             <span className="text-xs text-gray-500 ml-1">
                               ({service.reviewCount} reviews)
                             </span>
@@ -235,7 +253,8 @@ export default function Profile() {
                         </div>
                         <div className="text-right">
                           <div className="font-semibold">
-                            ${service.rate}{service.rateType === "hourly" ? "/hr" : ""}
+                            ${service.rate}
+                            {service.rateType === "hourly" ? "/hr" : ""}
                           </div>
                           <div className="text-xs text-gray-500 mt-1">
                             {service.category}
@@ -251,8 +270,12 @@ export default function Profile() {
             <Card className="tiger-card bg-gray-50">
               <CardContent className="p-8 text-center">
                 <Briefcase className="h-12 w-12 text-gray-300 mx-auto mb-3" />
-                <h3 className="text-lg font-medium text-gray-500 mb-2">No Services Yet</h3>
-                <p className="text-sm text-gray-500 mb-4">Share your skills with the Grambling community</p>
+                <h3 className="text-lg font-medium text-gray-500 mb-2">
+                  No Services Yet
+                </h3>
+                <p className="text-sm text-gray-500 mb-4">
+                  Share your skills with the Grambling community
+                </p>
                 <Link to="/services/new">
                   <Button className="bg-grambling-gold hover:bg-grambling-gold/90 text-grambling-black">
                     Create Service

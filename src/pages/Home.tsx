@@ -29,7 +29,7 @@ export default function Home() {
         <section className="bg-gradient-to-r from-grambling-black to-grambling-black/90 text-white rounded-lg p-6 shadow-lg">
           <h1 className="text-2xl font-bold mb-2">
             {isAuthenticated
-              ? `Welcome back, ${currentUser?.name?.split(" ")[0]}!`
+              ? `Welcome back, ${currentUser?.first_name?.split(" ")[0]}!`
               : "Welcome to Tiger Life"}
           </h1>
           <p className="mb-4 text-white/80">
