@@ -15,12 +15,27 @@ import {
   User,
   Clock,
 } from "lucide-react";
-import { mockListings } from "@/models/Marketplace";
+import {
+  mockListings,
+  setListings,
+  MarketplaceItem,
+} from "@/models/Marketplace";
 import { mockServices } from "@/models/Service";
+import { useEffect, useState } from "react";
 
 export default function Profile() {
   const { currentUser, isAuthenticated, logout } = useAuth();
+  const [listings, setNewListings] = useState<MarketplaceItem[]>([]);
   const navigate = useNavigate();
+
+  useEffect(() => {
+    const fetchListings = async () => {
+      const getlistings = await setListings();
+      setNewListings(getlistings);
+    };
+
+    fetchListings();
+  }, []);
 
   // Redirect to login if not authenticated
   if (!isAuthenticated) {
@@ -29,8 +44,8 @@ export default function Profile() {
   }
 
   // Filter listings and services for this user
-  const userListings = mockListings.filter(
-    (item) => item.sellerId === currentUser?.user_id
+  const userListings = listings.filter(
+    (item) => item.seller_id === currentUser?.user_id
   );
   const userServices = mockServices.filter(
     (service) => service.providerId === currentUser?.user_id
