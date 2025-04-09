@@ -1,4 +1,4 @@
-// Refactored the User model to match the database schema for testing purposes
+import { supabaseCon } from "@/db_api/connection";
 
 export interface User {
   user_id: string;
@@ -12,6 +12,11 @@ export interface User {
   joinedAt: Date;
   bio?: string;
 }
+
+export const setUsers = async (): Promise<User[]> => {
+  const users = await supabaseCon.getUsers();
+  return users.data;
+};
 
 export const mockUsers: User[] = [
   {

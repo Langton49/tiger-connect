@@ -163,7 +163,7 @@ class SupabaseDbConnection {
                     seller_id: seller_id,
                     condition: condition,
                     category: category,
-                    image: imageUrls.data,
+                    images: imageUrls.data,
                     status: "NA"
                 }])
 
@@ -212,6 +212,26 @@ class SupabaseDbConnection {
         return new Blob([u8arr], { type: mime });
     }
 
+    async getMarketPlaceListings() {
+        try {
+            const { data: listings, error: err } = await this.supabase.from('marketplace_items').select('*');
+            if (err) throw new Error(err.message);
+            return { success: true, data: listings }
+        } catch (error) {
+            return { success: false, error: error.message }
+        }
+    }
+
+    async getUsers() {
+        try {
+            const { data: users, error: err } = await this.supabase.from('user_table').select('*');
+            if (err) throw new Error(err.message);
+            console.log(users);
+            return { success: true, data: users }
+        } catch (error) {
+            return { success: false, error: error.message }
+        }
+    }
 }
 
 export const supabaseCon = new SupabaseDbConnection();
