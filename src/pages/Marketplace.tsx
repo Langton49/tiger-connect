@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { AppLayout } from "@/components/app-layout";
 import { useAuth } from "@/contexts/AuthContext";
@@ -7,8 +6,9 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Link } from "react-router-dom";
 import { Filter, Search, Plus, Check } from "lucide-react";
-import { mockListings, categories, MarketplaceItem } from "@/models/Marketplace";
-import { mockUsers } from "@/models/User";
+import { categories, MarketplaceItem } from "@/models/Marketplace";
+import { setUsers } from "@/models/User";
+import { mockUsers, User } from "@/models/User";
 import {
   Select,
   SelectContent,
@@ -26,6 +26,7 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet";
+import { setListings } from "@/models/Marketplace";
 
 export default function Marketplace() {
   const { isAuthenticated } = useAuth();
@@ -34,60 +35,91 @@ export default function Marketplace() {
   const [priceRange, setPriceRange] = useState<[number, number]>([0, 1000]);
   const [condition, setCondition] = useState<string>("");
   const [sortBy, setSortBy] = useState<string>("newest");
-  const [filteredListings, setFilteredListings] = useState<MarketplaceItem[]>(mockListings);
+  const [originalListings, setOriginalListings] = useState<MarketplaceItem[]>(
+    []
+  );
+  const [filteredListings, setFilteredListings] = useState<MarketplaceItem[]>(
+    []
+  );
+  const [users, setOtherUsers] = useState<User[]>([]);
 
   useEffect(() => {
-    let filtered = [...mockListings];
-    
+    const fetchListings = async () => {
+      const listings = await setListings();
+      setOriginalListings(listings);
+      setFilteredListings(listings);
+    };
+
+    const fetchUsers = async () => {
+      const users = await setUsers();
+      setOtherUsers(users);
+    };
+
+    fetchListings();
+    fetchUsers();
+  }, []);
+
+  useEffect(() => {
+    let filtered = [...originalListings];
+
     // Apply search query filter
     if (searchQuery) {
       const query = searchQuery.toLowerCase();
       filtered = filtered.filter(
-        item => 
-          item.title.toLowerCase().includes(query) || 
+        (item) =>
+          item.title.toLowerCase().includes(query) ||
           item.description.toLowerCase().includes(query)
       );
     }
-    
+
     // Apply category filter
     if (selectedCategory) {
-      filtered = filtered.filter(item => item.category === selectedCategory);
+      filtered = filtered.filter((item) => item.category === selectedCategory);
     }
-    
+
     // Apply price range filter
     filtered = filtered.filter(
-      item => item.price >= priceRange[0] && item.price <= priceRange[1]
+      (item) => item.price >= priceRange[0] && item.price <= priceRange[1]
     );
-    
+
     // Apply condition filter
     if (condition) {
-      filtered = filtered.filter(item => item.condition === condition);
+      filtered = filtered.filter((item) => item.condition === condition);
     }
-    
+
     // Apply sorting
     if (sortBy === "newest") {
-      filtered.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+      filtered.sort(
+        (a, b) =>
+          new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+      );
     } else if (sortBy === "oldest") {
-      filtered.sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
+      filtered.sort(
+        (a, b) =>
+          new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+      );
     } else if (sortBy === "price_low") {
       filtered.sort((a, b) => a.price - b.price);
     } else if (sortBy === "price_high") {
       filtered.sort((a, b) => b.price - a.price);
     }
-    
+
     setFilteredListings(filtered);
   }, [searchQuery, selectedCategory, priceRange, condition, sortBy]);
 
   // Get seller from mock data
   const getSellerName = (sellerId: string) => {
-    const seller = mockUsers.find(user => user.id === sellerId);
-    return seller ? seller.name : "Unknown Seller";
+    const seller = users.find((user) => user.user_id === sellerId);
+    return seller
+      ? seller.first_name + " " + seller.last_name
+      : "Unknown Seller";
   };
 
   const resetFilters = () => {
     setSelectedCategory("");
     setPriceRange([0, 1000]);
     setCondition("");
+    setSearchQuery("");
   };
 
   return (
@@ -104,7 +136,7 @@ export default function Marketplace() {
               className="pl-9 tiger-input"
             />
           </div>
-          
+
           <Sheet>
             <SheetTrigger asChild>
               <Button variant="outline" size="icon">
@@ -121,7 +153,10 @@ export default function Marketplace() {
               <div className="py-4 space-y-4">
                 <div className="space-y-2">
                   <label className="text-sm font-medium">Category</label>
-                  <Select value={selectedCategory} onValueChange={setSelectedCategory}>
+                  <Select
+                    value={selectedCategory}
+                    onValueChange={setSelectedCategory}
+                  >
                     <SelectTrigger>
                       <SelectValue placeholder="All Categories" />
                     </SelectTrigger>
@@ -135,7 +170,7 @@ export default function Marketplace() {
                     </SelectContent>
                   </Select>
                 </div>
-                
+
                 <div className="space-y-2">
                   <label className="text-sm font-medium">Condition</label>
                   <Select value={condition} onValueChange={setCondition}>
@@ -152,28 +187,32 @@ export default function Marketplace() {
                     </SelectContent>
                   </Select>
                 </div>
-                
+
                 <div className="space-y-2">
                   <label className="text-sm font-medium">Price Range</label>
                   <div className="flex items-center space-x-2">
-                    <Input 
-                      type="number" 
-                      min="0" 
-                      value={priceRange[0]} 
-                      onChange={(e) => setPriceRange([Number(e.target.value), priceRange[1]])} 
+                    <Input
+                      type="number"
+                      min="0"
+                      value={priceRange[0]}
+                      onChange={(e) =>
+                        setPriceRange([Number(e.target.value), priceRange[1]])
+                      }
                       className="tiger-input"
                     />
                     <span>to</span>
-                    <Input 
-                      type="number" 
-                      min="0" 
-                      value={priceRange[1]} 
-                      onChange={(e) => setPriceRange([priceRange[0], Number(e.target.value)])} 
+                    <Input
+                      type="number"
+                      min="0"
+                      value={priceRange[1]}
+                      onChange={(e) =>
+                        setPriceRange([priceRange[0], Number(e.target.value)])
+                      }
                       className="tiger-input"
                     />
                   </div>
                 </div>
-                
+
                 <div className="space-y-2">
                   <label className="text-sm font-medium">Sort By</label>
                   <Select value={sortBy} onValueChange={setSortBy}>
@@ -183,8 +222,12 @@ export default function Marketplace() {
                     <SelectContent>
                       <SelectItem value="newest">Newest First</SelectItem>
                       <SelectItem value="oldest">Oldest First</SelectItem>
-                      <SelectItem value="price_low">Price: Low to High</SelectItem>
-                      <SelectItem value="price_high">Price: High to Low</SelectItem>
+                      <SelectItem value="price_low">
+                        Price: Low to High
+                      </SelectItem>
+                      <SelectItem value="price_high">
+                        Price: High to Low
+                      </SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -201,23 +244,29 @@ export default function Marketplace() {
               </SheetFooter>
             </SheetContent>
           </Sheet>
-          
+
           {isAuthenticated && (
             <Link to="/marketplace/new">
-              <Button size="icon" className="bg-grambling-gold hover:bg-grambling-gold/90 text-grambling-black">
+              <Button
+                size="icon"
+                className="bg-grambling-gold hover:bg-grambling-gold/90 text-grambling-black"
+              >
                 <Plus className="h-4 w-4" />
               </Button>
             </Link>
           )}
         </div>
-        
+
         {/* Active Filters Display */}
-        {(selectedCategory || condition || priceRange[0] > 0 || priceRange[1] < 1000) && (
+        {(selectedCategory ||
+          condition ||
+          priceRange[0] > 0 ||
+          priceRange[1] < 1000) && (
           <div className="flex flex-wrap gap-2">
             {selectedCategory && (
               <div className="bg-grambling-gold/20 text-grambling-black text-xs py-1 px-2 rounded-full flex items-center">
                 {selectedCategory}
-                <button 
+                <button
                   onClick={() => setSelectedCategory("")}
                   className="ml-1 text-xs"
                 >
@@ -225,11 +274,11 @@ export default function Marketplace() {
                 </button>
               </div>
             )}
-            
+
             {condition && (
               <div className="bg-grambling-gold/20 text-grambling-black text-xs py-1 px-2 rounded-full flex items-center">
                 {condition}
-                <button 
+                <button
                   onClick={() => setCondition("")}
                   className="ml-1 text-xs"
                 >
@@ -237,11 +286,11 @@ export default function Marketplace() {
                 </button>
               </div>
             )}
-            
+
             {(priceRange[0] > 0 || priceRange[1] < 1000) && (
               <div className="bg-grambling-gold/20 text-grambling-black text-xs py-1 px-2 rounded-full flex items-center">
                 ${priceRange[0]} - ${priceRange[1]}
-                <button 
+                <button
                   onClick={() => setPriceRange([0, 1000])}
                   className="ml-1 text-xs"
                 >
@@ -249,8 +298,8 @@ export default function Marketplace() {
                 </button>
               </div>
             )}
-            
-            <button 
+
+            <button
               onClick={resetFilters}
               className="text-xs text-grambling-gold hover:underline"
             >
@@ -258,17 +307,24 @@ export default function Marketplace() {
             </button>
           </div>
         )}
-        
+
         {/* Listings */}
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
           {filteredListings.length > 0 ? (
             filteredListings.map((item) => (
-              <Link to={`/marketplace/${item.id}`} key={item.id} className="col-span-1">
+              <Link
+                to={`/marketplace/${item.id}`}
+                key={item.id}
+                className="col-span-1"
+              >
                 <Card className="tiger-card h-full">
                   <CardContent className="p-0">
                     <div className="aspect-square relative">
-                      <img 
-                        src={item.images[0] || "https://via.placeholder.com/300x300?text=Item"} 
+                      <img
+                        src={
+                          item.images[0] ||
+                          "https://via.placeholder.com/300x300?text=Item"
+                        }
                         alt={item.title}
                         className="w-full h-full object-cover rounded-t-lg"
                       />
@@ -277,19 +333,25 @@ export default function Marketplace() {
                       </div>
                       {item.status !== "Available" && (
                         <div className="absolute top-0 right-0 bg-grambling-black text-white px-2 py-1 rounded-bl-lg text-xs flex items-center">
-                          {item.status === "Sold" && <Check className="h-3 w-3 mr-1" />}
+                          {item.status === "Sold" && (
+                            <Check className="h-3 w-3 mr-1" />
+                          )}
                           {item.status}
                         </div>
                       )}
                     </div>
                     <div className="p-3">
-                      <h3 className="font-medium text-sm line-clamp-1">{item.title}</h3>
+                      <h3 className="font-medium text-sm line-clamp-1">
+                        {item.title}
+                      </h3>
                       <div className="flex justify-between items-center mt-1">
-                        <p className="text-xs text-gray-500">{item.condition}</p>
+                        <p className="text-xs text-gray-500">
+                          {item.condition}
+                        </p>
                         <p className="text-xs text-gray-500">{item.category}</p>
                       </div>
                       <p className="text-xs text-gray-500 mt-1">
-                        {getSellerName(item.sellerId)}
+                        {getSellerName(item.seller_id)}
                       </p>
                     </div>
                   </CardContent>
@@ -298,9 +360,11 @@ export default function Marketplace() {
             ))
           ) : (
             <div className="col-span-full text-center py-10">
-              <p className="text-gray-500">No items match your search criteria</p>
-              <Button 
-                variant="link" 
+              <p className="text-gray-500">
+                No items match your search criteria
+              </p>
+              <Button
+                variant="link"
                 onClick={resetFilters}
                 className="text-grambling-gold mt-2"
               >
@@ -309,13 +373,15 @@ export default function Marketplace() {
             </div>
           )}
         </div>
-        
+
         {/* Call to Action for Non-Authenticated Users */}
         {!isAuthenticated && (
           <Card className="bg-grambling-gold/10 border-grambling-gold/30">
             <CardContent className="p-4 text-center">
               <h3 className="font-semibold">Want to sell something?</h3>
-              <p className="text-sm mb-3">Sign in to post your items for sale</p>
+              <p className="text-sm mb-3">
+                Sign in to post your items for sale
+              </p>
               <Link to="/login">
                 <Button className="bg-grambling-gold hover:bg-grambling-gold/90 text-grambling-black">
                   Sign In
