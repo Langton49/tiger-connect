@@ -26,11 +26,17 @@ class SupabaseDbConnection {
 
             // If an error occurs during sign up, return an error message
             if (error) {
+                console.log(error.message);
                 throw new Error(error.message);
             }
 
             // If sign up to `auth` table is successful, insert the user data into our own personal table `user_table`
             // `user-table` has the following columns: `first_name`, `last_name`, `g_number`, `user_id` (which is a foreign key to the `auth` table)
+            if ((await this.userExists(gnumber)).exists) {
+                await this.supabase.auth.api.deleteUser(data.user.id);
+                throw new Error('User already exists');
+            }
+
             const { data: userData, error: insertError } = await this.supabase.from('user_table')
                 .insert([{
                     first_name: fname,

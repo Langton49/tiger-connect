@@ -77,7 +77,7 @@ export default function Register() {
       return;
     }
 
-    if (!email.endsWith("@gram.edu")) {
+    if (!email.endsWith("@gsumail.gram.edu")) {
       setError("Please use your Grambling email (ending with @gram.edu)");
       return;
     }
