@@ -7,7 +7,7 @@ import React, {
 } from "react";
 import { User } from "@/models/User";
 import { useToast } from "@/hooks/use-toast";
-import { supabaseCon } from "../db_api/connection.js";
+import { supabaseCon } from "@/db_api/connection.js";
 
 interface AuthContextType {
   currentUser: User | null;

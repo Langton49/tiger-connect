@@ -8,6 +8,7 @@ import { AppLayout } from "@/components/app-layout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { supabaseCon } from "@/db_api/connection.js"; // adjust path accordingly
 import {
     Form,
     FormControl,
@@ -49,7 +50,7 @@ const formSchema = z.object({
 
 export default function MarketplaceNew() {
     const navigate = useNavigate();
-    const { isAuthenticated } = useAuth();
+    const { currentUser, isAuthenticated } = useAuth();
     const [isSubmitting, setIsSubmitting] = useState(false);
 
     // ✅ Always call hooks first
@@ -77,13 +78,25 @@ export default function MarketplaceNew() {
     const onSubmit = async (values: z.infer<typeof formSchema>) => {
         setIsSubmitting(true);
         try {
-            console.log("Form values:", values);
+            const { data, error } = await supabaseCon
+                .from("marketplace_items") // replace with your actual table name
+                .insert([
+                    {
+                        title: values.title,
+                        description: values.description,
+                        price: values.price,
+                        condition: values.condition,
+                        category: values.category,
+                        images: values.images, // this should be an array of URLs
+                        created_at: new Date().toISOString(),
+                        user_id: currentUser?.user_id,
+                    },
+                ]);
 
-            // Simulate submission
-            setTimeout(() => {
-                toast.success("Item listed successfully!");
-                navigate("/marketplace");
-            }, 1000);
+            if (error) throw error;
+
+            toast.success("Item listed successfully!");
+            navigate("/marketplace");
         } catch (error) {
             console.error("Error submitting form:", error);
             toast.error("Failed to list item. Please try again.");
