@@ -23,7 +23,6 @@ export const eventCategories = [
 ];
 
 export const mockEvents: Event[] = [
-  // Your existing 3 events...
   {
     id: "1",
     title: "Homecoming Week",

@@ -57,7 +57,7 @@ class SupabaseDbConnection {
             return {
                 success: true,
                 data: {
-                    user_id: data.user_id,
+                    user_id: data.user.id,
                     first_name: fname,
                     last_name: lname,
                     email: email,
@@ -148,6 +148,69 @@ class SupabaseDbConnection {
         }
     }
 
+    // Make supabase storage bucket 
+    // Store url of image in supabase storage bucket
+    // Store url in the `images` column of the `marketplace_items` table
+
+    async listItemsToMarketPlace(name, desc, price, seller_id, condition, category, images) {
+        try {
+            const imageUrls = await this.uploadImagesToBucket(images, seller_id);
+            const { data, error } = await this.supabase.from('marketplace_items')
+                .insert([{
+                    title: name,
+                    description: desc,
+                    price: price,
+                    seller_id: seller_id,
+                    condition: condition,
+                    category: category,
+                    image: imageUrls.data,
+                    status: "NA"
+                }])
+
+            if (error) throw new Error(error.message);
+            return { success: true, data: data }
+        } catch (error) {
+            return { success: false, error: error.message }
+        }
+
+    }
+
+    async uploadImagesToBucket(images, currentUserId) {
+        try {
+            const imageUrls = await Promise.all(
+                images.map(async (base64Image) => {
+                    const filePath = `pictures/${currentUserId}/${Date.now()}.png`;
+
+                    const { error: uploadError } = await this.supabase.storage
+                        .from('pictures')
+                        .upload(filePath, this.dataURLtoBlob(base64Image));
+
+                    if (uploadError) throw uploadError;
+
+                    const { data: { publicUrl } } = await this.supabase.storage
+                        .from('pictures')
+                        .getPublicUrl(filePath);
+
+                    return publicUrl;
+                })
+            );
+            return { success: true, data: imageUrls };
+        } catch (error) {
+            return { success: false, error: error.message }
+        }
+    }
+
+    dataURLtoBlob(dataURL) {
+        const arr = dataURL.split(',');
+        const mime = arr[0].match(/:(.*?);/)[1];
+        const bstr = atob(arr[1]);
+        let n = bstr.length;
+        const u8arr = new Uint8Array(n);
+        while (n--) {
+            u8arr[n] = bstr.charCodeAt(n);
+        }
+        return new Blob([u8arr], { type: mime });
+    }
 
 }
 
