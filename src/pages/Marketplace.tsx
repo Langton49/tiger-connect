@@ -8,7 +8,7 @@ import { Link } from "react-router-dom";
 import { Filter, Search, Plus, Check } from "lucide-react";
 import { categories, MarketplaceItem } from "@/models/Marketplace";
 import { setUsers } from "@/models/User";
-import { mockUsers, User } from "@/models/User";
+import { User } from "@/models/User";
 import {
   Select,
   SelectContent,

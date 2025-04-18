@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { AppLayout } from "@/components/app-layout";
 import { useAuth } from "@/contexts/AuthContext";
@@ -8,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Link } from "react-router-dom";
 import { Filter, Search, Plus, Star } from "lucide-react";
 import { mockServices, serviceCategories, Service } from "@/models/Service";
-import { mockUsers } from "@/models/User";
+import { setUsers } from "@/models/User";
 import {
   Select,
   SelectContent,
@@ -26,6 +25,8 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet";
+import { User } from "@/models/User";
+import { setServiceListings } from "@/models/Service";
 
 export default function Services() {
   const { isAuthenticated } = useAuth();
@@ -34,36 +35,56 @@ export default function Services() {
   const [rateRange, setRateRange] = useState<[number, number]>([0, 500]);
   const [minRating, setMinRating] = useState<number>(0);
   const [sortBy, setSortBy] = useState<string>("rating");
-  const [filteredServices, setFilteredServices] = useState<Service[]>(mockServices);
+  const [originalServices, setOriginalServices] = useState<Service[]>([]);
+  const [filteredServices, setFilteredServices] = useState<Service[]>([]);
+  const [users, setOtherUsers] = useState<User[]>([]);
 
   useEffect(() => {
-    let filtered = [...mockServices];
-    
+    const fetchListings = async () => {
+      const listings = await setServiceListings();
+      setOriginalServices(listings);
+      setFilteredServices(listings);
+    };
+
+    const fetchUsers = async () => {
+      const users = await setUsers();
+      setOtherUsers(users);
+    };
+
+    fetchListings();
+    fetchUsers();
+  }, []);
+
+  useEffect(() => {
+    let filtered = [...originalServices];
+
     // Apply search query filter
     if (searchQuery) {
       const query = searchQuery.toLowerCase();
       filtered = filtered.filter(
-        service => 
-          service.title.toLowerCase().includes(query) || 
+        (service) =>
+          service.title.toLowerCase().includes(query) ||
           service.description.toLowerCase().includes(query)
       );
     }
-    
+
     // Apply category filter
     if (selectedCategory) {
-      filtered = filtered.filter(service => service.category === selectedCategory);
+      filtered = filtered.filter(
+        (service) => service.category === selectedCategory
+      );
     }
-    
+
     // Apply rate range filter
     filtered = filtered.filter(
-      service => service.rate >= rateRange[0] && service.rate <= rateRange[1]
+      (service) => service.rate >= rateRange[0] && service.rate <= rateRange[1]
     );
-    
+
     // Apply minimum rating filter
     if (minRating > 0) {
-      filtered = filtered.filter(service => service.rating >= minRating);
+      filtered = filtered.filter((service) => service.rating >= minRating);
     }
-    
+
     // Apply sorting
     if (sortBy === "rating") {
       filtered.sort((a, b) => b.rating - a.rating);
@@ -74,14 +95,16 @@ export default function Services() {
     } else if (sortBy === "most_reviews") {
       filtered.sort((a, b) => b.reviewCount - a.reviewCount);
     }
-    
+
     setFilteredServices(filtered);
   }, [searchQuery, selectedCategory, rateRange, minRating, sortBy]);
 
   // Get provider from mock data
   const getProviderName = (providerId: string) => {
-    const provider = mockUsers.find(user => user.id === providerId);
-    return provider ? provider.name : "Unknown Provider";
+    const provider = users.find((user) => user.user_id === providerId);
+    return provider
+      ? provider.first_name + " " + provider.last_name
+      : "Unknown Provider";
   };
 
   const resetFilters = () => {
@@ -104,7 +127,7 @@ export default function Services() {
               className="pl-9 tiger-input"
             />
           </div>
-          
+
           <Sheet>
             <SheetTrigger asChild>
               <Button variant="outline" size="icon">
@@ -121,7 +144,10 @@ export default function Services() {
               <div className="py-4 space-y-4">
                 <div className="space-y-2">
                   <label className="text-sm font-medium">Category</label>
-                  <Select value={selectedCategory} onValueChange={setSelectedCategory}>
+                  <Select
+                    value={selectedCategory}
+                    onValueChange={setSelectedCategory}
+                  >
                     <SelectTrigger>
                       <SelectValue placeholder="All Categories" />
                     </SelectTrigger>
@@ -135,11 +161,11 @@ export default function Services() {
                     </SelectContent>
                   </Select>
                 </div>
-                
+
                 <div className="space-y-2">
                   <label className="text-sm font-medium">Minimum Rating</label>
-                  <Select 
-                    value={minRating.toString()} 
+                  <Select
+                    value={minRating.toString()}
                     onValueChange={(val) => setMinRating(Number(val))}
                   >
                     <SelectTrigger>
@@ -153,28 +179,32 @@ export default function Services() {
                     </SelectContent>
                   </Select>
                 </div>
-                
+
                 <div className="space-y-2">
                   <label className="text-sm font-medium">Price Range</label>
                   <div className="flex items-center space-x-2">
-                    <Input 
-                      type="number" 
-                      min="0" 
-                      value={rateRange[0]} 
-                      onChange={(e) => setRateRange([Number(e.target.value), rateRange[1]])} 
+                    <Input
+                      type="number"
+                      min="0"
+                      value={rateRange[0]}
+                      onChange={(e) =>
+                        setRateRange([Number(e.target.value), rateRange[1]])
+                      }
                       className="tiger-input"
                     />
                     <span>to</span>
-                    <Input 
-                      type="number" 
-                      min="0" 
-                      value={rateRange[1]} 
-                      onChange={(e) => setRateRange([rateRange[0], Number(e.target.value)])} 
+                    <Input
+                      type="number"
+                      min="0"
+                      value={rateRange[1]}
+                      onChange={(e) =>
+                        setRateRange([rateRange[0], Number(e.target.value)])
+                      }
                       className="tiger-input"
                     />
                   </div>
                 </div>
-                
+
                 <div className="space-y-2">
                   <label className="text-sm font-medium">Sort By</label>
                   <Select value={sortBy} onValueChange={setSortBy}>
@@ -184,8 +214,12 @@ export default function Services() {
                     <SelectContent>
                       <SelectItem value="rating">Highest Rated</SelectItem>
                       <SelectItem value="most_reviews">Most Reviews</SelectItem>
-                      <SelectItem value="price_low">Price: Low to High</SelectItem>
-                      <SelectItem value="price_high">Price: High to Low</SelectItem>
+                      <SelectItem value="price_low">
+                        Price: Low to High
+                      </SelectItem>
+                      <SelectItem value="price_high">
+                        Price: High to Low
+                      </SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -202,23 +236,29 @@ export default function Services() {
               </SheetFooter>
             </SheetContent>
           </Sheet>
-          
+
           {isAuthenticated && (
             <Link to="/services/new">
-              <Button size="icon" className="bg-grambling-gold hover:bg-grambling-gold/90 text-grambling-black">
+              <Button
+                size="icon"
+                className="bg-grambling-gold hover:bg-grambling-gold/90 text-grambling-black"
+              >
                 <Plus className="h-4 w-4" />
               </Button>
             </Link>
           )}
         </div>
-        
+
         {/* Active Filters Display */}
-        {(selectedCategory || minRating > 0 || rateRange[0] > 0 || rateRange[1] < 500) && (
+        {(selectedCategory ||
+          minRating > 0 ||
+          rateRange[0] > 0 ||
+          rateRange[1] < 500) && (
           <div className="flex flex-wrap gap-2">
             {selectedCategory && (
               <div className="bg-grambling-gold/20 text-grambling-black text-xs py-1 px-2 rounded-full flex items-center">
                 {selectedCategory}
-                <button 
+                <button
                   onClick={() => setSelectedCategory("")}
                   className="ml-1 text-xs"
                 >
@@ -226,11 +266,11 @@ export default function Services() {
                 </button>
               </div>
             )}
-            
+
             {minRating > 0 && (
               <div className="bg-grambling-gold/20 text-grambling-black text-xs py-1 px-2 rounded-full flex items-center">
                 {minRating}+ Stars
-                <button 
+                <button
                   onClick={() => setMinRating(0)}
                   className="ml-1 text-xs"
                 >
@@ -238,11 +278,11 @@ export default function Services() {
                 </button>
               </div>
             )}
-            
+
             {(rateRange[0] > 0 || rateRange[1] < 500) && (
               <div className="bg-grambling-gold/20 text-grambling-black text-xs py-1 px-2 rounded-full flex items-center">
                 ${rateRange[0]} - ${rateRange[1]}
-                <button 
+                <button
                   onClick={() => setRateRange([0, 500])}
                   className="ml-1 text-xs"
                 >
@@ -250,8 +290,8 @@ export default function Services() {
                 </button>
               </div>
             )}
-            
-            <button 
+
+            <button
               onClick={resetFilters}
               className="text-xs text-grambling-gold hover:underline"
             >
@@ -259,7 +299,7 @@ export default function Services() {
             </button>
           </div>
         )}
-        
+
         {/* Services */}
         <div className="space-y-3">
           {filteredServices.length > 0 ? (
@@ -276,21 +316,26 @@ export default function Services() {
                         <div className="flex items-center mt-2">
                           <div className="flex items-center">
                             <Star className="h-4 w-4 text-grambling-gold fill-grambling-gold" />
-                            <span className="text-sm ml-1">{service.rating}</span>
+                            <span className="text-sm ml-1">
+                              {service.rating}
+                            </span>
                             <span className="text-xs text-gray-500 ml-1">
                               ({service.reviewCount} reviews)
                             </span>
                           </div>
                           <span className="mx-2 text-gray-300">•</span>
-                          <span className="text-xs text-gray-500">{service.category}</span>
+                          <span className="text-xs text-gray-500">
+                            {service.category}
+                          </span>
                         </div>
                         <p className="text-xs text-gray-500 mt-1">
-                          By {getProviderName(service.providerId)}
+                          By {getProviderName(service.provider_id)}
                         </p>
                       </div>
                       <div className="text-right">
                         <div className="font-semibold">
-                          ${service.rate}{service.rateType === "hourly" ? "/hr" : ""}
+                          ${service.rate}
+                          {service.rateType === "hourly" ? "/hr" : ""}
                         </div>
                         <div className="text-xs p-1 bg-grambling-gold/10 text-grambling-black rounded mt-2">
                           {service.availability[0]}
@@ -303,9 +348,11 @@ export default function Services() {
             ))
           ) : (
             <div className="text-center py-10">
-              <p className="text-gray-500">No services match your search criteria</p>
-              <Button 
-                variant="link" 
+              <p className="text-gray-500">
+                No services match your search criteria
+              </p>
+              <Button
+                variant="link"
                 onClick={resetFilters}
                 className="text-grambling-gold mt-2"
               >
@@ -314,7 +361,7 @@ export default function Services() {
             </div>
           )}
         </div>
-        
+
         {/* Call to Action for Non-Authenticated Users */}
         {!isAuthenticated && (
           <Card className="bg-grambling-gold/10 border-grambling-gold/30">
