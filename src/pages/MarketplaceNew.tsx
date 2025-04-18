@@ -77,7 +77,6 @@ export default function MarketplaceNew() {
 
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
     setIsSubmitting(true);
-    console.log(currentUser);
     try {
       const { data, error } = await supabaseCon.listItemsToMarketPlace(
         values.title,

@@ -1,5 +1,4 @@
 import { createClient } from "@supabase/supabase-js"; // Import the Supabase client library
-
 // Initialize the Supabase client with the Supabase URL and API key
 // Define a class for the Supabase database connection
 // This class will handle the connection to the Supabase database and provide methods for interacting with it
@@ -175,6 +174,28 @@ class SupabaseDbConnection {
 
     }
 
+    async listServices(name, desc, rate, rateType, category, providerId, availability, image) {
+        try {
+            const imageUrl = await this.uploadImagesToBucket([image], providerId);
+            const { data, error } = await this.supabase.from('services_table')
+                .insert([{
+                    title: name,
+                    description: desc,
+                    rate: rate,
+                    rateType: rateType,
+                    category: category,
+                    provider_id: providerId,
+                    availability: availability,
+                    image: imageUrl.data[0]
+                }])
+
+            if (error) throw new Error(error.message);
+            return { success: true, data: data }
+        } catch (error) {
+            return { success: false, error: error.message }
+        }
+    }
+
     async uploadImagesToBucket(images, currentUserId) {
         try {
             const imageUrls = await Promise.all(
@@ -217,6 +238,16 @@ class SupabaseDbConnection {
             const { data: listings, error: err } = await this.supabase.from('marketplace_items').select('*');
             if (err) throw new Error(err.message);
             return { success: true, data: listings }
+        } catch (error) {
+            return { success: false, error: error.message }
+        }
+    }
+
+    async getServicesListings() {
+        try {
+            const { data: services, error: err } = await this.supabase.from('services_table').select('*');
+            if (err) throw new Error(err.message);
+            return { success: true, data: services }
         } catch (error) {
             return { success: false, error: error.message }
         }

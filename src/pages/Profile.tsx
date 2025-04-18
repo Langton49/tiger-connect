@@ -15,23 +15,24 @@ import {
   User,
   Clock,
 } from "lucide-react";
-import {
-  mockListings,
-  setListings,
-  MarketplaceItem,
-} from "@/models/Marketplace";
-import { mockServices } from "@/models/Service";
+import { setListings, MarketplaceItem } from "@/models/Marketplace";
+import { Service, setServiceListings } from "@/models/Service";
 import { useEffect, useState } from "react";
 
 export default function Profile() {
   const { currentUser, isAuthenticated, logout } = useAuth();
-  const [listings, setNewListings] = useState<MarketplaceItem[]>([]);
+  const [marketListings, setNewMarketListings] = useState<MarketplaceItem[]>(
+    []
+  );
+  const [serviceListings, setNewServiceListings] = useState<Service[]>([]);
   const navigate = useNavigate();
 
   useEffect(() => {
     const fetchListings = async () => {
       const getlistings = await setListings();
-      setNewListings(getlistings);
+      const getServices = await setServiceListings();
+      setNewMarketListings(getlistings);
+      setNewServiceListings(getServices);
     };
 
     fetchListings();
@@ -44,11 +45,11 @@ export default function Profile() {
   }
 
   // Filter listings and services for this user
-  const userListings = listings.filter(
+  const userListings = marketListings.filter(
     (item) => item.seller_id === currentUser?.user_id
   );
-  const userServices = mockServices.filter(
-    (service) => service.providerId === currentUser?.user_id
+  const userServices = serviceListings.filter(
+    (service) => service.provider_id === currentUser?.user_id
   );
 
   const handleLogout = () => {
