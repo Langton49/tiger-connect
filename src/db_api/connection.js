@@ -263,6 +263,48 @@ class SupabaseDbConnection {
             return { success: false, error: error.message }
         }
     }
-}
+    // Send a new message
+    async sendMessage(senderId, receiverId, content) {
+        try {
+            const { data, error } = await this.supabase
+                .from('Messages')
+                .insert([
+                    {
+                        sender_id: senderId,
+                        receiver_id: receiverId,
+                        content: content,
+                    }
+                ]);
 
+            if (error) {
+                return { success: false, error: error.message };
+            }
+
+            return { success: true, data };
+        } catch (err) {
+            return { success: false, error: "Unexpected error. Please try again." };
+        }
+    }
+
+    // Get all messages between two users
+    async getMessages(userA, userB) {
+        try {
+        const { data, error } = await this.supabase
+            .from('messages')
+            .select('*')
+            .or(`and(sender_id.eq.${userA},receiver_id.eq.${userB}),and(sender_id.eq.${userB},receiver_id.eq.${userA})`)
+            .order('created_at', { ascending: true });
+    
+        if (error) {
+            return { success: false, error: error.message };
+        }
+    
+        return { success: true, messages: data };
+        } catch (err) {
+        return { success: false, error: "Unexpected error while fetching messages." };
+        }
+    }
+
+}
+// Export the Supabase connection instance
 export const supabaseCon = new SupabaseDbConnection();
