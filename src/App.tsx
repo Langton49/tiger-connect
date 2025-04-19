@@ -17,6 +17,7 @@ import Login from "./pages/Login";
 import Register from "./pages/Register";
 import VerifyAccount from "./pages/VerifyAccount";
 import NotFound from "./pages/NotFound";
+import MessagesPage from "./pages/Messages";
 
 const queryClient = new QueryClient();
 
@@ -42,6 +43,7 @@ const App = () => (
                         <Route path="/register" element={<Register />} />
                         <Route path="/verify" element={<VerifyAccount />} />
                         <Route path="*" element={<NotFound />} />
+                        <Route path="/messages" element={<MessagesPage />} />
                     </Routes>
                 </BrowserRouter>
             </AuthProvider>
