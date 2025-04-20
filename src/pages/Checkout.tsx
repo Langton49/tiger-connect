@@ -8,7 +8,7 @@ import { useCart } from "@/contexts/CartContext";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@/components/ui/use-toast";
 import { CardElement, useStripe, useElements } from "@stripe/react-stripe-js";
-import axios from "axios";
+import { createClient } from "@supabase/supabase-js";
 
 interface FormData {
     firstName: string;
@@ -39,15 +39,20 @@ export default function Checkout() {
         cardName: "",
     });
 
-    const handleInputChange = (
-        e: React.ChangeEvent<HTMLInputElement>,
-        field: keyof FormData
-    ) => {
-        setFormData((prev) => ({
-            ...prev,
-            [field]: e.target.value,
-        }));
-    };
+  const supabase = createClient(
+    import.meta.env.VITE_SUPABASE_URL,
+    import.meta.env.VITE_SUPABASE_KEY
+  );
+
+  const handleInputChange = (
+    e: React.ChangeEvent<HTMLInputElement>,
+    field: keyof FormData
+  ) => {
+    setFormData((prev) => ({
+      ...prev,
+      [field]: e.target.value,
+    }));
+  };
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -63,88 +68,105 @@ export default function Checkout() {
 
         setIsProcessing(true);
 
-        try {
-            // Create payment intent on your backend
-            const {
-                data: { clientSecret },
-            } = await axios.post(
-                `${import.meta.env.VITE_API_URL}/create-payment-intent`,
-                {
-                    amount: totalPrice * 100, // Convert to cents
-                    metadata: {
-                        customerName: `${formData.firstName} ${formData.lastName}`,
-                        customerEmail: formData.email,
-                        shippingAddress: `${formData.address}, ${formData.city}, ${formData.state} ${formData.zipCode}`,
-                    },
-                }
-            );
+    try {
+      const { data: paymentIntentData, error: intentError } =
+        await supabase.functions.invoke("create-payment-intent", {
+          body: JSON.stringify({
+            amount: Math.round(totalPrice * 100),
+            metadata: {
+              customer_name: `${formData.firstName} ${formData.lastName}`,
+              customer_email: formData.email,
+              shipping_address: `${formData.address}, ${formData.city}, ${formData.state} ${formData.zipCode}`,
+              items: JSON.stringify(
+                items.map((item) => ({
+                  id: item.item.id,
+                  seller_stripe_id: item.item.seller_stripe_id,
+                  quantity: item.quantity,
+                  totalPrice: item.item.price * item.quantity,
+                }))
+              ),
+            },
+          }),
+        });
 
-            // Confirm the payment with Stripe
-            const { error, paymentIntent } = await stripe.confirmCardPayment(
-                clientSecret,
-                {
-                    payment_method: {
-                        card: elements.getElement(CardElement)!,
-                        billing_details: {
-                            name: formData.cardName,
-                            email: formData.email,
-                            address: {
-                                line1: formData.address,
-                                city: formData.city,
-                                state: formData.state,
-                                postal_code: formData.zipCode,
-                            },
-                        },
-                    },
-                }
-            );
+      if (intentError || !paymentIntentData?.clientSecret) {
+        throw new Error(
+          intentError?.message || "Failed to create payment intent"
+        );
+      }
 
-            if (error) {
-                throw new Error(error.message);
-            }
+      const { error: confirmError, paymentIntent } =
+        await stripe.confirmCardPayment(paymentIntentData.clientSecret, {
+          payment_method: {
+            card: elements.getElement(CardElement)!,
+            billing_details: {
+              name: formData.cardName,
+              email: formData.email,
+              address: {
+                line1: formData.address,
+                city: formData.city,
+                state: formData.state,
+                postal_code: formData.zipCode,
+                country: "US",
+              },
+            },
+          },
+        });
 
-            if (paymentIntent.status === "succeeded") {
-                // Create order in your backend
-                await axios.post(`${import.meta.env.VITE_API_URL}/orders`, {
-                    paymentIntentId: paymentIntent.id,
-                    amount: totalPrice,
-                    items,
-                    customerInfo: {
-                        firstName: formData.firstName,
-                        lastName: formData.lastName,
-                        email: formData.email,
-                        address: formData.address,
-                        city: formData.city,
-                        state: formData.state,
-                        zipCode: formData.zipCode,
-                    },
-                });
+      if (confirmError) {
+        throw new Error(confirmError.message);
+      }
 
-                clearCart();
-                toast({
-                    title: "Payment succeeded!",
-                    description: "Thank you for your purchase.",
-                });
-                navigate("/order-success");
-            }
-        } catch (error) {
-            console.error("Payment error:", error);
-            toast({
-                title: "Payment failed",
-                description:
-                    error instanceof Error
-                        ? error.message
-                        : "An unknown error occurred",
-                variant: "destructive",
-            });
-        } finally {
-            setIsProcessing(false);
+      if (paymentIntent?.status === "succeeded") {
+        const { data: userData } = await supabase.auth.getUser();
+        const customerId = userData.user?.id || null;
+
+        const { error: orderError } = await supabase.from("orders").insert({
+          payment_intent_id: paymentIntent.id,
+          amount: totalPrice,
+          status: "processing",
+          user_id: customerId,
+          items: items.map((item) => ({
+            product_id: item.item.id,
+            seller_id: item.item.seller_id,
+            quantity: item.quantity,
+            price: item.item.price,
+          })),
+        });
+
+        if (orderError) {
+          console.error("Order creation error:", orderError);
+          throw new Error("Failed to create order");
         }
-    };
 
-    if (items.length === 0) {
-        navigate("/cart");
-        return null;
+        await supabase.functions.invoke("process-seller-payouts", {
+          body: JSON.stringify({
+            payment_intent_id: paymentIntent.id,
+          }),
+        });
+
+        clearCart();
+        toast({
+          title: "Payment succeeded!",
+          description: "Thank you for your purchase.",
+        });
+        navigate("/order-success", {
+          state: {
+            paymentId: paymentIntent.id,
+            amount: totalPrice,
+          },
+        });
+      }
+    } catch (error) {
+      console.error("Payment error:", error);
+      toast({
+        title: "Payment failed",
+        description:
+          error instanceof Error ? error.message : "An unknown error occurred",
+        variant: "destructive",
+      });
+    } finally {
+      setIsProcessing(false);
     }
 
     return (
@@ -290,6 +312,35 @@ export default function Checkout() {
                                         </div>
                                     </div>
 
+                  <div className="space-y-2">
+                    <Label htmlFor="cardName">Name on Card</Label>
+                    <Input
+                      id="cardName"
+                      value={formData.cardName}
+                      onChange={(e) => handleInputChange(e, "cardName")}
+                      required
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label>Card Details</Label>
+                    <div className="border rounded-md p-2">
+                      <CardElement
+                        options={{
+                          style: {
+                            base: {
+                              fontSize: "16px",
+                              color: "#424770",
+                              "::placeholder": {
+                                color: "#aab7c4",
+                              },
+                            },
+                            invalid: {
+                              color: "#9e2146",
+                            },
+                          },
+                        }}
+                      />
                                     <Button
                                         type="submit"
                                         className="w-full bg-grambling-gold hover:bg-grambling-gold/90 text-grambling-black"

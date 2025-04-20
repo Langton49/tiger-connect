@@ -28,6 +28,7 @@ import { categories } from "@/models/Marketplace";
 import { ImageUpload } from "@/components/image-upload";
 import { ArrowLeft } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
+import SellerOnboarding from "./Onboarding";
 
 const formSchema = z.object({
   title: z.string().min(5, {
@@ -52,6 +53,7 @@ export default function MarketplaceNew() {
   const navigate = useNavigate();
   const { currentUser, isAuthenticated } = useAuth();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [canSell, setCanSell] = useState(false);
 
   // ✅ Always call hooks first
   const form = useForm<z.infer<typeof formSchema>>({
@@ -66,13 +68,24 @@ export default function MarketplaceNew() {
     },
   });
 
-  // ✅ Handle redirect as a side effect
-  useEffect(() => {
-    if (!isAuthenticated) {
-      navigate("/login", { replace: true });
-    }
-  }, [isAuthenticated, navigate]);
+  // useEffect(() => {
+  //   if (!isAuthenticated) {
+  //     navigate("/login", { replace: true });
+  //     return;
+  //   }
 
+  //   // const checkSeller = async () => {
+  //   //   try {
+  //   //     const res = await supabaseCon.checkSellerStatus(currentUser?.user_id);
+  //   //     setCanSell(res ?? false);
+  //   //   } catch (error) {
+  //   //     console.error("Error checking seller status:", error);
+  //   //     toast.error("Failed to verify seller status");
+  //   //   }
+  //   // };
+
+  //   checkSeller();
+  // }, [isAuthenticated, navigate, currentUser]);
   if (!isAuthenticated) return null;
 
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
@@ -158,6 +171,10 @@ export default function MarketplaceNew() {
       setIsSubmitting(false);
     }
   };
+
+  // if (!canSell) {
+  //   return <SellerOnboarding />;
+  // }
 
   return (
     <AppLayout title="List Item for Sale">

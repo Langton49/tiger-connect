@@ -115,44 +115,29 @@ class SupabaseDbConnection {
         }
     }
 
-    async listItemsToMarketPlace(
-        name,
-        desc,
-        price,
-        seller_id,
-        condition,
-        category,
-        images
-    ) {
+    // Make supabase storage bucket 
+    // Store url of image in supabase storage bucket
+    // Store url in the `images` column of the `marketplace_items` table
+
+    async listItemsToMarketPlace(name, desc, price, seller_id, condition, category, images) {
+        let itemData = {
+            title: name,
+            description: desc,
+            price: price,
+            seller_id: seller_id,
+            condition: condition,
+            category: category,
+            status: "NA"
+        }
         try {
-            console.log('Starting marketplace listing with parameters:', {
-                title: name,
-                seller_id: seller_id,
-                category: category,
-                images_count: images.length
-            });
-            
+            const stripeID = await this.getSellerStripeID(seller_id)
+            if (!stripeID.success) throw new Error(stripeID.error)
+            itemData.seller_stripe_id = stripeID.data.stripe_account_id
             const imageUrls = await this.uploadImagesToBucket(images, seller_id);
-            
-            if (!imageUrls.success) {
-                console.error('Failed to upload images:', imageUrls.error);
-                return { success: false, error: 'Failed to upload images: ' + imageUrls.error };
-            }
-            
-            console.log('Images uploaded successfully, adding listing to database');
-            
+            if (!imageUrls.success) throw new Error(imageUrls.error)
+            itemData.images = imageUrls.data
             const { data, error } = await this.supabase.from('marketplace_items')
-                .insert([{
-                    title: name,
-                    description: desc,
-                    price: price,
-                    seller_id: seller_id,
-                    condition: condition,
-                    category: category,
-                    images: imageUrls.data,
-                    status: "NA"
-                }])
-                .select(); // Add .select() to return the inserted rows
+                .insert([itemData])
 
             if (error) {
                 console.error('Error inserting marketplace item:', error.message);
@@ -164,6 +149,21 @@ class SupabaseDbConnection {
         } catch (error) {
             return { success: false, error: error.message };
             console.error('Error in listItemsToMarketPlace:', error);
+            return { success: false, error: error.message }
+        }
+    }
+
+
+    async getSellerStripeID(seller_id) {
+        try {
+            const { data, error } = await this.supabase.from('user_table')
+                .select('stripe_account_id')
+                .eq('user_id', seller_id)
+                .maybeSingle();
+
+            if (error) throw new Error(error.message);
+            return { success: true, data: data }
+        } catch (error) {
             return { success: false, error: error.message }
         }
     }
@@ -290,6 +290,30 @@ class SupabaseDbConnection {
             return { success: false, error: error.message };
         }
     }
+
+    // async checkSellerStatus(userId) {
+    //     try {
+    //         const { data, error } = await this.supabase
+    //             .from('user_table')
+    //             .select('stripe_account_id, stripe_account_status')
+    //             .eq('user_id', userId)
+    //             .maybeSingle();
+
+    //         if (error) {
+    //             throw new Error(error.message);
+    //         }
+
+    //         if (!data || !data.stripe_account_id || data.stripe_account_status !== 'complete') {
+    //             return false;
+    //         }
+    //         return true;
+    //     } catch (err) {
+    //         console.error("Error checking seller status:", err.message);
+    //         return null;
+    //     }
+
+    // }
+
 
     async sendMessage(senderId, receiverId, content) {
         try {

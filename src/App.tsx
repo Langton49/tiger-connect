@@ -6,6 +6,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { CartProvider } from "@/contexts/CartContext";
 import { Elements } from "@stripe/react-stripe-js";
+import SellerOnboarding from "./pages/Onboarding";
 
 // Pages
 import Home from "./pages/Home";
@@ -63,6 +64,10 @@ const App = () => (
                 <Route path="/messages" element={<MessagesInbox />} />
                 <Route path="/notifications" element={<Notifications />} />
                 <Route path="*" element={<NotFound />} />
+                <Route
+                  path="/onboarding"
+                  element={<SellerOnboarding />}
+                ></Route>
               </Routes>
             </BrowserRouter>
           </CartProvider>

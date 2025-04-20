@@ -11,6 +11,7 @@ export interface MarketplaceItem {
   seller_id: string;
   created_at: Date;
   status: "Available" | "Pending" | "Sold";
+  seller_stripe_id?: string;
 }
 
 export const categories = [
