@@ -283,28 +283,28 @@ class SupabaseDbConnection {
         }
     }
 
-    async checkSellerStatus(userId) {
-        try {
-            const { data, error } = await this.supabase
-                .from('user_table')
-                .select('stripe_account_id, stripe_account_status')
-                .eq('user_id', userId)
-                .maybeSingle();
+    // async checkSellerStatus(userId) {
+    //     try {
+    //         const { data, error } = await this.supabase
+    //             .from('user_table')
+    //             .select('stripe_account_id, stripe_account_status')
+    //             .eq('user_id', userId)
+    //             .maybeSingle();
 
-            if (error) {
-                throw new Error(error.message);
-            }
+    //         if (error) {
+    //             throw new Error(error.message);
+    //         }
 
-            if (!data || !data.stripe_account_id || data.stripe_account_status !== 'complete') {
-                return false;
-            }
-            return true;
-        } catch (err) {
-            console.error("Error checking seller status:", err.message);
-            return null;
-        }
+    //         if (!data || !data.stripe_account_id || data.stripe_account_status !== 'complete') {
+    //             return false;
+    //         }
+    //         return true;
+    //     } catch (err) {
+    //         console.error("Error checking seller status:", err.message);
+    //         return null;
+    //     }
 
-    }
+    // }
 
 }
 // Export the Supabase connection instance

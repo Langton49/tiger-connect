@@ -68,24 +68,24 @@ export default function MarketplaceNew() {
     },
   });
 
-  useEffect(() => {
-    if (!isAuthenticated) {
-      navigate("/login", { replace: true });
-      return;
-    }
+  // useEffect(() => {
+  //   if (!isAuthenticated) {
+  //     navigate("/login", { replace: true });
+  //     return;
+  //   }
 
-    const checkSeller = async () => {
-      try {
-        const res = await supabaseCon.checkSellerStatus(currentUser?.user_id);
-        setCanSell(res ?? false);
-      } catch (error) {
-        console.error("Error checking seller status:", error);
-        toast.error("Failed to verify seller status");
-      }
-    };
+  //   // const checkSeller = async () => {
+  //   //   try {
+  //   //     const res = await supabaseCon.checkSellerStatus(currentUser?.user_id);
+  //   //     setCanSell(res ?? false);
+  //   //   } catch (error) {
+  //   //     console.error("Error checking seller status:", error);
+  //   //     toast.error("Failed to verify seller status");
+  //   //   }
+  //   // };
 
-    checkSeller();
-  }, [isAuthenticated, navigate, currentUser]);
+  //   checkSeller();
+  // }, [isAuthenticated, navigate, currentUser]);
   if (!isAuthenticated) return null;
 
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
@@ -113,9 +113,9 @@ export default function MarketplaceNew() {
     }
   };
 
-  if (!canSell) {
-    return <SellerOnboarding />;
-  }
+  // if (!canSell) {
+  //   return <SellerOnboarding />;
+  // }
 
   return (
     <AppLayout title="List Item for Sale">
