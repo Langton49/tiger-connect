@@ -153,7 +153,22 @@ class SupabaseDbConnection {
 
     async listItemsToMarketPlace(name, desc, price, seller_id, condition, category, images) {
         try {
+            console.log('Starting marketplace listing with parameters:', {
+                title: name,
+                seller_id: seller_id,
+                category: category,
+                images_count: images.length
+            });
+            
             const imageUrls = await this.uploadImagesToBucket(images, seller_id);
+            
+            if (!imageUrls.success) {
+                console.error('Failed to upload images:', imageUrls.error);
+                return { success: false, error: 'Failed to upload images: ' + imageUrls.error };
+            }
+            
+            console.log('Images uploaded successfully, adding listing to database');
+            
             const { data, error } = await this.supabase.from('marketplace_items')
                 .insert([{
                     title: name,
@@ -165,18 +180,39 @@ class SupabaseDbConnection {
                     images: imageUrls.data,
                     status: "NA"
                 }])
+                .select(); // Add .select() to return the inserted rows
 
-            if (error) throw new Error(error.message);
+            if (error) {
+                console.error('Error inserting marketplace item:', error.message);
+                throw new Error(error.message);
+            }
+            
+            console.log('Marketplace listing successful, data:', data);
             return { success: true, data: data }
         } catch (error) {
+            console.error('Error in listItemsToMarketPlace:', error);
             return { success: false, error: error.message }
         }
-
     }
 
     async listServices(name, desc, rate, rateType, category, providerId, availability, image) {
         try {
+            console.log('Starting service listing with parameters:', {
+                title: name,
+                provider_id: providerId,
+                category: category,
+                has_image: !!image
+            });
+            
             const imageUrl = await this.uploadImagesToBucket([image], providerId);
+            
+            if (!imageUrl.success) {
+                console.error('Failed to upload service image:', imageUrl.error);
+                return { success: false, error: 'Failed to upload image: ' + imageUrl.error };
+            }
+            
+            console.log('Image uploaded successfully, adding service to database');
+            
             const { data, error } = await this.supabase.from('services_table')
                 .insert([{
                     title: name,
@@ -188,10 +224,17 @@ class SupabaseDbConnection {
                     availability: availability,
                     image: imageUrl.data[0]
                 }])
+                .select(); // Add .select() to return the inserted rows
 
-            if (error) throw new Error(error.message);
+            if (error) {
+                console.error('Error inserting service:', error.message);
+                throw new Error(error.message);
+            }
+            
+            console.log('Service listing successful, data:', data);
             return { success: true, data: data }
         } catch (error) {
+            console.error('Error in listServices:', error);
             return { success: false, error: error.message }
         }
     }
@@ -438,6 +481,176 @@ class SupabaseDbConnection {
             console.error('❌ Unexpected error in getConversations:', error);
             return { success: false, error: error.message };
         }
+    }
+
+    // Add a notification for a user
+    async addNotification(userId, type, title, message, relatedId = null) {
+        try {
+            if (!userId) {
+                console.error('Missing userId in addNotification', { userId, type, title });
+                return { success: false, error: 'Missing user ID' };
+            }
+            
+            const userIdStr = String(userId);
+            
+            console.log('Adding notification with parameters:', {
+                user_id: userIdStr,
+                type,
+                title,
+                message,
+                relatedId
+            });
+            
+            try {
+                const { data, error } = await this.supabase
+                    .from('Notifications')
+                    .insert([{
+                        user_id: userIdStr,
+                        type: type, // 'message', 'listing', 'purchase', 'sale', 'booking'
+                        title: title,
+                        message: message,
+                        related_id: relatedId,
+                        read: false,
+                        created_at: new Date()
+                    }]);
+                    
+                if (error) {
+                    console.error('Error adding notification to database:', error.message, error);
+                    return { success: false, error: error.message };
+                }
+                
+                console.log('Notification added successfully:', data);
+                return { success: true, data };
+            } catch (dbError) {
+                console.error('Database error when adding notification:', dbError);
+                return { success: false, error: 'Database error: ' + dbError.message };
+            }
+        } catch (err) {
+            console.error('Unexpected error adding notification:', err);
+            return { success: false, error: "Unexpected error. Please try again." };
+        }
+    }
+    
+    // Get notifications for a user
+    async getNotifications(userId) {
+        try {
+            const userIdStr = String(userId);
+            
+            console.log('Fetching notifications for user:', userIdStr);
+            
+            const { data, error } = await this.supabase
+                .from('Notifications')
+                .select('*')
+                .eq('user_id', userIdStr)
+                .order('created_at', { ascending: false });
+                
+            if (error) {
+                console.error('Error fetching notifications:', error.message);
+                return { success: false, error: error.message };
+            }
+            
+            return { success: true, data };
+        } catch (err) {
+            console.error('Unexpected error fetching notifications:', err);
+            return { success: false, error: "Unexpected error while fetching notifications." };
+        }
+    }
+    
+    // Mark a notification as read
+    async markNotificationRead(notificationId, isRead = true) {
+        try {
+            const { data, error } = await this.supabase
+                .from('Notifications')
+                .update({ read: isRead })
+                .eq('id', notificationId);
+                
+            if (error) {
+                console.error('Error updating notification:', error.message);
+                return { success: false, error: error.message };
+            }
+            
+            return { success: true, data };
+        } catch (err) {
+            console.error('Unexpected error updating notification:', err);
+            return { success: false, error: "Unexpected error. Please try again." };
+        }
+    }
+    
+    // Get unread notification count for a user
+    async getUnreadNotificationCount(userId) {
+        try {
+            const userIdStr = String(userId);
+            
+            const { data, error, count } = await this.supabase
+                .from('Notifications')
+                .select('*', { count: 'exact' })
+                .eq('user_id', userIdStr)
+                .eq('read', false);
+                
+            if (error) {
+                console.error('Error counting notifications:', error.message);
+                return { success: false, error: error.message };
+            }
+            
+            return { success: true, count };
+        } catch (err) {
+            console.error('Unexpected error counting notifications:', err);
+            return { success: false, error: "Unexpected error while counting notifications." };
+        }
+    }
+
+    // Helper: Create a message notification
+    async createMessageNotification(receiverId, senderId, senderName) {
+        console.log('Creating message notification with params:', { receiverId, senderId, senderName });
+        
+        if (!receiverId || !senderId) {
+            console.error('Missing required parameters for createMessageNotification', { receiverId, senderId });
+            return { success: false, error: 'Missing required parameters' };
+        }
+        
+        const title = "New Message";
+        const message = `You have a new message from ${senderName}`;
+        return this.addNotification(receiverId, 'message', title, message, senderId);
+    }
+    
+    // Helper: Create a new listing notification
+    async createNewListingNotification(ownerId, listingId, listingTitle) {
+        const title = "Listing Published";
+        const message = `Your item "${listingTitle}" has been successfully listed for sale`;
+        return this.addNotification(ownerId, 'listing', title, message, listingId);
+    }
+    
+    // Helper: Create a new service notification
+    async createNewServiceNotification(providerId, serviceId, serviceTitle) {
+        const title = "Service Published";
+        const message = `Your service "${serviceTitle}" has been successfully listed`;
+        return this.addNotification(providerId, 'service', title, message, serviceId);
+    }
+    
+    // Helper: Create a purchase notification
+    async createPurchaseNotification(buyerId, sellerId, orderId, itemTitle) {
+        // Notify buyer
+        const buyerTitle = "Purchase Successful";
+        const buyerMessage = `You have successfully purchased "${itemTitle}"`;
+        await this.addNotification(buyerId, 'purchase', buyerTitle, buyerMessage, orderId);
+        
+        // Notify seller
+        const sellerTitle = "Item Sold";
+        const sellerMessage = `Your item "${itemTitle}" has been purchased`;
+        return this.addNotification(sellerId, 'sale', sellerTitle, sellerMessage, orderId);
+    }
+    
+    // Helper: Create a booking notification
+    async createBookingNotification(userId, providerId, bookingId, serviceTitle) {
+        // Notify user who booked
+        const userTitle = "Booking Confirmed";
+        const userMessage = `Your booking for "${serviceTitle}" has been confirmed`;
+        await this.addNotification(userId, 'booking', userTitle, userMessage, bookingId);
+        
+        // Notify service provider
+        const providerTitle = "New Booking";
+        const providerMessage = `Someone has booked your service "${serviceTitle}"`;
+        return this.addNotification(providerId, 'booking', providerTitle, providerMessage, bookingId);
     }
 
 }

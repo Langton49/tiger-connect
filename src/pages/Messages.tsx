@@ -4,6 +4,8 @@ import { supabaseCon } from "@/db_api/connection";
 import { ArrowLeft, RefreshCw } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
 import { Button } from "@/components/ui/button";
+import { AppLayout } from "@/components/app-layout";
+import { toast } from "sonner";
 
 export default function MessagesPage() {
   const { currentUser } = useAuth();
@@ -113,6 +115,27 @@ export default function MessagesPage() {
       if (res.success) {
         console.log("Message sent successfully");
         setMessageText("");
+        
+        // Create a notification for the recipient
+        try {
+          if (receiverInfo) {
+            console.log("Creating notification for receiver:", receiver);
+            const notifRes = await supabaseCon.createMessageNotification(
+              receiver, 
+              currentUser.user_id, 
+              `${currentUser.first_name} ${currentUser.last_name}`
+            );
+            
+            if (!notifRes.success) {
+              console.error("Failed to create message notification:", notifRes.error);
+            } else {
+              console.log("Message notification created successfully");
+            }
+          }
+        } catch (notifErr) {
+          console.error("Error creating message notification:", notifErr);
+        }
+        
         await fetchMessages(); // Use await to ensure messages are fetched before updating UI
       } else {
         console.error("Failed to send message:", res.error);
@@ -140,86 +163,88 @@ export default function MessagesPage() {
   };
 
   return (
-    <div className="max-w-3xl mx-auto p-4">
-      {/* 🔙 Back Button and Header */}
-      <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center gap-3">
-          <ArrowLeft
-            className="cursor-pointer text-grambling-gold hover:text-grambling-gold/80"
-            onClick={() => navigate(-1)}
-          />
-          <h2 className="text-xl font-semibold">
-            {receiverInfo ? `${receiverInfo.first_name} ${receiverInfo.last_name}` : "Messages"}
-          </h2>
+    <AppLayout title="Messages">
+      <div className="max-w-3xl mx-auto p-4">
+        {/* 🔙 Back Button and Header */}
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-3">
+            <ArrowLeft
+              className="cursor-pointer text-grambling-gold hover:text-grambling-gold/80"
+              onClick={() => navigate(-1)}
+            />
+            <h2 className="text-xl font-semibold">
+              {receiverInfo ? `${receiverInfo.first_name} ${receiverInfo.last_name}` : "Messages"}
+            </h2>
+          </div>
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            onClick={fetchMessages} 
+            disabled={refreshing}
+            className="flex items-center gap-1"
+          >
+            <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
+            <span>Refresh</span>
+          </Button>
         </div>
-        <Button 
-          variant="ghost" 
-          size="sm" 
-          onClick={fetchMessages} 
-          disabled={refreshing}
-          className="flex items-center gap-1"
-        >
-          <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
-          <span>Refresh</span>
-        </Button>
-      </div>
 
-      {/* 🧾 Message List */}
-      <div className="border rounded p-4 h-[400px] overflow-y-auto bg-gray-50">
-        {loading ? (
-          <p className="text-center text-gray-400 mt-20">Loading messages...</p>
-        ) : messages.length === 0 ? (
-          <p className="text-center text-gray-400 mt-20">
-            No messages yet. Start the conversation!
-          </p>
-        ) : (
-          <>
-            {messages.map((msg) => (
-              <div
-                key={msg.id}
-                className={`mb-3 ${
-                  msg.sender_id === currentUser?.user_id
-                    ? "text-right"
-                    : "text-left"
-                }`}
-              >
-                <div 
-                  className={`inline-block max-w-[80%] rounded-lg p-3 ${
+        {/* 🧾 Message List */}
+        <div className="border rounded p-4 h-[400px] overflow-y-auto bg-gray-50">
+          {loading ? (
+            <p className="text-center text-gray-400 mt-20">Loading messages...</p>
+          ) : messages.length === 0 ? (
+            <p className="text-center text-gray-400 mt-20">
+              No messages yet. Start the conversation!
+            </p>
+          ) : (
+            <>
+              {messages.map((msg) => (
+                <div
+                  key={msg.id}
+                  className={`mb-3 ${
                     msg.sender_id === currentUser?.user_id
-                      ? "bg-yellow-100"
-                      : "bg-white border"
+                      ? "text-right"
+                      : "text-left"
                   }`}
                 >
-                  <div className="text-sm mb-1">{msg.content}</div>
-                  <div className="text-xs text-gray-500">
-                    {formatTime(msg.created_at)}
+                  <div 
+                    className={`inline-block max-w-[80%] rounded-lg p-3 ${
+                      msg.sender_id === currentUser?.user_id
+                        ? "bg-yellow-100"
+                        : "bg-white border"
+                    }`}
+                  >
+                    <div className="text-sm mb-1">{msg.content}</div>
+                    <div className="text-xs text-gray-500">
+                      {formatTime(msg.created_at)}
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
-            <div ref={messagesEndRef} />
-          </>
-        )}
-      </div>
+              ))}
+              <div ref={messagesEndRef} />
+            </>
+          )}
+        </div>
 
-      {/* ✍️ Message Input */}
-      <div className="flex mt-4 gap-2">
-        <textarea
-          value={messageText}
-          onChange={(e) => setMessageText(e.target.value)}
-          onKeyDown={handleKeyDown}
-          placeholder="Type your message..."
-          className="flex-1 border px-4 py-2 rounded resize-none h-[60px]"
-          disabled={loading || !receiverId}
-        />
-        <button
-          onClick={handleSend}
-          className="bg-grambling-gold text-black px-4 py-2 rounded h-[60px]"
-          disabled={loading || !messageText.trim() || !receiverId}
-        >
-          Send
-        </button>
+        {/* ✍️ Message Input */}
+        <div className="flex mt-4 gap-2">
+          <textarea
+            value={messageText}
+            onChange={(e) => setMessageText(e.target.value)}
+            onKeyDown={handleKeyDown}
+            placeholder="Type your message..."
+            className="flex-1 border px-4 py-2 rounded resize-none h-[60px]"
+            disabled={loading || !receiverId}
+          />
+          <button
+            onClick={handleSend}
+            className="bg-grambling-gold text-black px-4 py-2 rounded h-[60px]"
+            disabled={loading || !messageText.trim() || !receiverId}
+          >
+            Send
+          </button>
+        </div>
       </div>
-    </div>
+    </AppLayout>
   );
 }

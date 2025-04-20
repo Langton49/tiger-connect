@@ -110,7 +110,48 @@ export default function Services() {
   return (
     <AppLayout title="Services">
       <div className="space-y-4">
-        {/* ... filter controls ... */}
+        {/* Search and Filter Bar */}
+        <div className="flex items-center gap-3">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500 h-4 w-4" />
+            <Input
+              placeholder="Search for services..."
+              className="pl-10"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
+          </div>
+          <Sheet>
+            <SheetTrigger asChild>
+              <Button variant="outline" size="icon">
+                <Filter className="h-4 w-4" />
+              </Button>
+            </SheetTrigger>
+            <SheetContent>
+              <SheetHeader>
+                <SheetTitle>Filter Services</SheetTitle>
+                <SheetDescription>
+                  Filter services by category, rate, and rating
+                </SheetDescription>
+              </SheetHeader>
+              {/* Filter content would go here */}
+              <SheetFooter className="mt-4">
+                <SheetClose asChild>
+                  <Button onClick={resetFilters}>Reset Filters</Button>
+                </SheetClose>
+              </SheetFooter>
+            </SheetContent>
+          </Sheet>
+          {isAuthenticated && (
+            <Link to="/services/new">
+              <Button className="bg-grambling-gold hover:bg-grambling-gold/90 text-grambling-black">
+                <Plus className="h-4 w-4 mr-2" />
+                Offer Service
+              </Button>
+            </Link>
+          )}
+        </div>
+
         <div className="space-y-3">
           {filteredServices.length > 0 ? (
             filteredServices.map((service) => (
