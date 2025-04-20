@@ -3,7 +3,7 @@ import { createClient } from "@supabase/supabase-js"; // Import the Supabase cli
 class SupabaseDbConnection {
     constructor() {
         this.supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-        this.supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY; // ✅ Updated to match your .env
+        this.supabaseKey = import.meta.env.VITE_SUPABASE_KEY; // ✅ Updated to match your .env
         this.supabase = createClient(this.supabaseUrl, this.supabaseKey);
     }
 
@@ -143,7 +143,7 @@ class SupabaseDbConnection {
                 console.error('Error inserting marketplace item:', error.message);
                 throw new Error(error.message);
             }
-            
+
             console.log('Marketplace listing successful, data:', data);
             return { success: true, data: data }
         } catch (error) {
@@ -185,16 +185,16 @@ class SupabaseDbConnection {
                 category: category,
                 has_image: !!image
             });
-            
+
             const imageUrl = await this.uploadImagesToBucket([image], providerId);
-            
+
             if (!imageUrl.success) {
                 console.error('Failed to upload service image:', imageUrl.error);
                 return { success: false, error: 'Failed to upload image: ' + imageUrl.error };
             }
-            
+
             console.log('Image uploaded successfully, adding service to database');
-            
+
             const { data, error } = await this.supabase.from('services_table')
                 .insert([{
                     title: name,
@@ -212,7 +212,7 @@ class SupabaseDbConnection {
                 console.error('Error inserting service:', error.message);
                 throw new Error(error.message);
             }
-            
+
             console.log('Service listing successful, data:', data);
             return { success: true, data: data }
         } catch (error) {
@@ -320,13 +320,13 @@ class SupabaseDbConnection {
             // Ensure both IDs are strings
             const senderIdStr = String(senderId);
             const receiverIdStr = String(receiverId);
-            
+
             console.log('Sending message with parameters:', {
                 sender_id: senderIdStr,
                 receiver_id: receiverIdStr,
                 content: content
             });
-            
+
             const { data, error } = await this.supabase
                 .from("Messages")
                 .insert([
@@ -358,41 +358,41 @@ class SupabaseDbConnection {
             // Ensure both IDs are strings
             const userAStr = String(userA);
             const userBStr = String(userB);
-            
+
             console.log('Fetching messages between users:', {
                 userA: userAStr,
                 userB: userBStr
             });
-            
+
             // First query: messages from userA to userB
             const { data: sentMessages, error: sentError } = await this.supabase
                 .from('Messages')
                 .select('*')
                 .eq('sender_id', userAStr)
                 .eq('receiver_id', userBStr);
-            
+
             if (sentError) {
                 console.error('Error fetching sent messages:', sentError.message);
                 return { success: false, error: sentError.message };
             }
-            
+
             // Second query: messages from userB to userA
             const { data: receivedMessages, error: receivedError } = await this.supabase
                 .from('Messages')
                 .select('*')
                 .eq('sender_id', userBStr)
                 .eq('receiver_id', userAStr);
-            
+
             if (receivedError) {
                 console.error('Error fetching received messages:', receivedError.message);
                 return { success: false, error: receivedError.message };
             }
-            
+
             // Combine and sort the messages
             const allMessages = [...sentMessages, ...receivedMessages].sort(
                 (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
             );
-            
+
             return { success: true, messages: allMessages };
         } catch (err) {
             console.error('Unexpected error in getMessages:', err);
@@ -404,29 +404,29 @@ class SupabaseDbConnection {
         try {
             // Ensure ID is a string
             const currentUserIdStr = String(currentUserId);
-            
+
             console.log('🔍 getConversations - Looking for conversations for user:', currentUserIdStr);
-            
+
             // Debug: Check if the Messages table exists and has right structure
             const { data: tableInfo, error: tableError } = await this.supabase
                 .from('Messages')
                 .select('count(*)', { count: 'exact' })
                 .limit(1);
-                
+
             console.log('🔍 Messages table check:', { tableInfo, tableError });
-            
+
             // Fetch all messages where currentUserId is sender
             const { data: sentMessages, error: sentError } = await this.supabase
                 .from("Messages")
                 .select("sender_id, receiver_id, content, created_at")
                 .eq("sender_id", currentUserIdStr);
 
-            console.log('📤 Sent messages:', { 
-                count: sentMessages?.length || 0, 
+            console.log('📤 Sent messages:', {
+                count: sentMessages?.length || 0,
                 messages: sentMessages,
                 error: sentError
             });
-            
+
             if (sentError) {
                 console.error('❌ Error fetching sent messages:', sentError.message);
                 throw new Error(sentError.message);
@@ -438,12 +438,12 @@ class SupabaseDbConnection {
                 .select("sender_id, receiver_id, content, created_at")
                 .eq("receiver_id", currentUserIdStr);
 
-            console.log('📥 Received messages:', { 
-                count: receivedMessages?.length || 0, 
+            console.log('📥 Received messages:', {
+                count: receivedMessages?.length || 0,
                 messages: receivedMessages,
                 error: receivedError
             });
-            
+
             if (receivedError) {
                 console.error('❌ Error fetching received messages:', receivedError.message);
                 throw new Error(receivedError.message);
@@ -451,12 +451,12 @@ class SupabaseDbConnection {
 
             // Extract conversation partners
             const partnerIds = new Set();
-            
+
             // From sent messages, add receivers
             sentMessages.forEach(msg => {
                 partnerIds.add(msg.receiver_id);
             });
-            
+
             // From received messages, add senders
             receivedMessages.forEach(msg => {
                 partnerIds.add(msg.sender_id);
@@ -476,12 +476,12 @@ class SupabaseDbConnection {
                 .select("user_id, first_name, last_name")
                 .in("user_id", uniqueIds);
 
-            console.log('👤 Conversation partners info:', { 
-                count: users?.length || 0, 
+            console.log('👤 Conversation partners info:', {
+                count: users?.length || 0,
                 users,
                 error: userError
             });
-            
+
             if (userError) {
                 console.error('❌ Error fetching user info:', userError.message);
                 throw new Error(userError.message);
@@ -501,9 +501,9 @@ class SupabaseDbConnection {
                 console.error('Missing userId in addNotification', { userId, type, title });
                 return { success: false, error: 'Missing user ID' };
             }
-            
+
             const userIdStr = String(userId);
-            
+
             console.log('Adding notification with parameters:', {
                 user_id: userIdStr,
                 type,
@@ -511,7 +511,7 @@ class SupabaseDbConnection {
                 message,
                 relatedId
             });
-            
+
             try {
                 const { data, error } = await this.supabase
                     .from('Notifications')
@@ -524,12 +524,12 @@ class SupabaseDbConnection {
                         read: false,
                         created_at: new Date()
                     }]);
-                    
+
                 if (error) {
                     console.error('Error adding notification to database:', error.message, error);
                     return { success: false, error: error.message };
                 }
-                
+
                 console.log('Notification added successfully:', data);
                 return { success: true, data };
             } catch (dbError) {
@@ -541,32 +541,32 @@ class SupabaseDbConnection {
             return { success: false, error: "Unexpected error. Please try again." };
         }
     }
-    
+
     // Get notifications for a user
     async getNotifications(userId) {
         try {
             const userIdStr = String(userId);
-            
+
             console.log('Fetching notifications for user:', userIdStr);
-            
+
             const { data, error } = await this.supabase
                 .from('Notifications')
                 .select('*')
                 .eq('user_id', userIdStr)
                 .order('created_at', { ascending: false });
-                
+
             if (error) {
                 console.error('Error fetching notifications:', error.message);
                 return { success: false, error: error.message };
             }
-            
+
             return { success: true, data };
         } catch (err) {
             console.error('Unexpected error fetching notifications:', err);
             return { success: false, error: "Unexpected error while fetching notifications." };
         }
     }
-    
+
     // Mark a notification as read
     async markNotificationRead(notificationId, isRead = true) {
         try {
@@ -574,12 +574,12 @@ class SupabaseDbConnection {
                 .from('Notifications')
                 .update({ read: isRead })
                 .eq('id', notificationId);
-                
+
             if (error) {
                 console.error('Error updating notification:', error.message);
                 return { success: false, error: error.message };
             }
-            
+
             return { success: true, data };
         } catch (err) {
             return {
@@ -587,27 +587,25 @@ class SupabaseDbConnection {
                 error: "Unexpected error while fetching messages.",
             };
         }
-            console.error('Unexpected error updating notification:', err);
-            return { success: false, error: "Unexpected error. Please try again." };
-        }
     }
-    
+
+
     // Get unread notification count for a user
     async getUnreadNotificationCount(userId) {
         try {
             const userIdStr = String(userId);
-            
+
             const { data, error, count } = await this.supabase
                 .from('Notifications')
                 .select('*', { count: 'exact' })
                 .eq('user_id', userIdStr)
                 .eq('read', false);
-                
+
             if (error) {
                 console.error('Error counting notifications:', error.message);
                 return { success: false, error: error.message };
             }
-            
+
             return { success: true, count };
         } catch (err) {
             console.error('Unexpected error counting notifications:', err);
@@ -618,51 +616,51 @@ class SupabaseDbConnection {
     // Helper: Create a message notification
     async createMessageNotification(receiverId, senderId, senderName) {
         console.log('Creating message notification with params:', { receiverId, senderId, senderName });
-        
+
         if (!receiverId || !senderId) {
             console.error('Missing required parameters for createMessageNotification', { receiverId, senderId });
             return { success: false, error: 'Missing required parameters' };
         }
-        
+
         const title = "New Message";
         const message = `You have a new message from ${senderName}`;
         return this.addNotification(receiverId, 'message', title, message, senderId);
     }
-    
+
     // Helper: Create a new listing notification
     async createNewListingNotification(ownerId, listingId, listingTitle) {
         const title = "Listing Published";
         const message = `Your item "${listingTitle}" has been successfully listed for sale`;
         return this.addNotification(ownerId, 'listing', title, message, listingId);
     }
-    
+
     // Helper: Create a new service notification
     async createNewServiceNotification(providerId, serviceId, serviceTitle) {
         const title = "Service Published";
         const message = `Your service "${serviceTitle}" has been successfully listed`;
         return this.addNotification(providerId, 'service', title, message, serviceId);
     }
-    
+
     // Helper: Create a purchase notification
     async createPurchaseNotification(buyerId, sellerId, orderId, itemTitle) {
         // Notify buyer
         const buyerTitle = "Purchase Successful";
         const buyerMessage = `You have successfully purchased "${itemTitle}"`;
         await this.addNotification(buyerId, 'purchase', buyerTitle, buyerMessage, orderId);
-        
+
         // Notify seller
         const sellerTitle = "Item Sold";
         const sellerMessage = `Your item "${itemTitle}" has been purchased`;
         return this.addNotification(sellerId, 'sale', sellerTitle, sellerMessage, orderId);
     }
-    
+
     // Helper: Create a booking notification
     async createBookingNotification(userId, providerId, bookingId, serviceTitle) {
         // Notify user who booked
         const userTitle = "Booking Confirmed";
         const userMessage = `Your booking for "${serviceTitle}" has been confirmed`;
         await this.addNotification(userId, 'booking', userTitle, userMessage, bookingId);
-        
+
         // Notify service provider
         const providerTitle = "New Booking";
         const providerMessage = `Someone has booked your service "${serviceTitle}"`;
