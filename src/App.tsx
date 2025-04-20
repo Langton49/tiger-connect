@@ -24,6 +24,7 @@ import Cart from "./pages/Cart";
 import Checkout from "./pages/Checkout";
 import OrderSuccess from "./pages/OrderSuccess";
 import MessagesPage from "./pages/Messages";
+import MessagesInbox from "./pages/MessagesInbox";
 import { loadStripe } from "@stripe/stripe-js";
 
 const queryClient = new QueryClient();
@@ -53,7 +54,8 @@ const App = () => (
                 <Route path="/cart" element={<Cart />} />
                 <Route path="/checkout" element={<Checkout />} />
                 <Route path="/order-success" element={<OrderSuccess />} />
-                <Route path="/messages" element={<MessagesPage />} />
+                <Route path="/messages/:recieverId" element={<MessagesPage />} />
+                <Route path="/messages" element={<MessagesInbox />} />
                 <Route path="*" element={<NotFound />} />
               </Routes>
             </BrowserRouter>

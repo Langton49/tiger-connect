@@ -1,7 +1,7 @@
 import { Bell, MessageSquare, Search, User } from "lucide-react";
 import { Link } from "react-router-dom";
 
-export function AppHeader({ title }: { title: string }) {
+export function AppHeader({ title, user }: { title: string; user: { user_id: string } }) {
   return (
     <header className="bg-grambling-black text-white p-4 sticky top-0 z-40">
       <div className="container mx-auto flex items-center justify-between">
@@ -21,10 +21,7 @@ export function AppHeader({ title }: { title: string }) {
           </Link>
         </div>
         <div className="flex items-center space-x-4">
-          <Link to="/search" className="text-white">
-            <Search className="h-6 w-6" />
-          </Link>
-          <Link to="/messages" className="text-white">
+          <Link to={`/messages`}>
             <MessageSquare className="h-6 w-6" />
           </Link>
           <Link to="/notifications" className="text-white">

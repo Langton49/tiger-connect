@@ -290,7 +290,7 @@ class SupabaseDbConnection {
     async getMessages(userA, userB) {
         try {
         const { data, error } = await this.supabase
-            .from('messages')
+            .from('Messages')
             .select('*')
             .or(`and(sender_id.eq.${userA},receiver_id.eq.${userB}),and(sender_id.eq.${userB},receiver_id.eq.${userA})`)
             .order('created_at', { ascending: true });
@@ -304,6 +304,43 @@ class SupabaseDbConnection {
         return { success: false, error: "Unexpected error while fetching messages." };
         }
     }
+    // Fetch recent conversations for the logged-in user
+    async getConversations(currentUserId) {
+    try {
+        // Fetch all messages where currentUserId is sender or receiver
+        const { data: messages, error } = await this.supabase
+            .from("Messages")
+            .select("sender_id, receiver_id")
+            .or(`sender_id.eq.${currentUserId},receiver_id.eq.${currentUserId}`);
+
+        if (error) throw new Error(error.message);
+
+        // Extract conversation partners
+        const partnerIds = new Set();
+        messages.forEach(msg => {
+            if (msg.sender_id !== currentUserId) partnerIds.add(msg.sender_id);
+            if (msg.receiver_id !== currentUserId) partnerIds.add(msg.receiver_id);
+        });
+
+        const uniqueIds = Array.from(partnerIds);
+
+        if (uniqueIds.length === 0) {
+            return { success: true, data: [] };
+        }
+
+        // Fetch their info from user_table
+        const { data: users, error: userError } = await this.supabase
+            .from("user_table")
+            .select("user_id, first_name, last_name, email")
+            .in("user_id", uniqueIds);
+
+        if (userError) throw new Error(userError.message);
+
+        return { success: true, data: users };
+    } catch (error) {
+        return { success: false, error: error.message };
+    }
+}
 
 }
 // Export the Supabase connection instance
