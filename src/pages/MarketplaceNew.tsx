@@ -91,7 +91,8 @@ export default function MarketplaceNew() {
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
     setIsSubmitting(true);
     try {
-      const { data, error } = await supabaseCon.listItemsToMarketPlace(
+      // First attempt to list the item
+      const listingResult = await supabaseCon.listItemsToMarketPlace(
         values.title,
         values.description,
         values.price,
@@ -101,10 +102,68 @@ export default function MarketplaceNew() {
         values.images
       );
 
-      if (error) throw error;
+      // Check if the listing was successful
+      if (!listingResult.success) {
+        console.error("Listing failed:", listingResult.error);
+        toast.error("Failed to list item: " + listingResult.error);
+        setIsSubmitting(false);
+        return;
+      }
 
-      toast.success("Item listed successfully!");
-      navigate("/marketplace");
+      console.log("Listing successful, data:", listingResult.data);
+      
+      // Only try to create notification if the listing was successful
+      try {
+        // Get the item ID from the response
+        let itemId;
+        
+        if (Array.isArray(listingResult.data) && listingResult.data.length > 0) {
+          itemId = listingResult.data[0]?.id;
+          console.log("Found item ID from array:", itemId);
+        } else if (listingResult.data && typeof listingResult.data === 'object') {
+          itemId = listingResult.data.id;
+          console.log("Found item ID from object:", itemId);
+        } else {
+          console.log("Data returned:", JSON.stringify(listingResult.data));
+        }
+          
+        if (itemId) {
+          console.log(`Creating notification for item ID: ${itemId} and user ID: ${currentUser?.user_id}`);
+          const notificationResult = await supabaseCon.createNewListingNotification(
+            currentUser?.user_id,
+            itemId,
+            values.title
+          );
+          
+          if (notificationResult.success) {
+            console.log("Notification created successfully");
+          } else {
+            console.error("Notification creation failed:", notificationResult.error);
+          }
+        } else {
+          console.warn("Item ID not found in response, skipping notification creation");
+        }
+      } catch (notificationError) {
+        // If notification creation fails, just log it but don't fail the whole operation
+        console.error("Error creating notification:", notificationError);
+      }
+
+      // Always show success message and redirect even if notification fails
+      toast.success("Your item has been successfully listed on the marketplace!");
+
+      // Force a refresh of notifications before navigation
+      try {
+        // This will fire an event that the app-header listens for
+        const refreshEvent = new CustomEvent('refreshNotifications');
+        window.dispatchEvent(refreshEvent);
+      } catch (e) {
+        console.error("Failed to trigger notification refresh:", e);
+      }
+
+      // Navigate to marketplace after a slight delay to allow notifications to be created
+      setTimeout(() => {
+        navigate("/marketplace");
+      }, 300);
     } catch (error) {
       console.error("Error submitting form:", error);
       toast.error("Failed to list item. Please try again.");
