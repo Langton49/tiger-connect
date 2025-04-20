@@ -66,27 +66,28 @@ export default function VerifyAccount() {
             const fileExt = studentIdImage.name.split(".").pop();
             const fileName = `${currentUser.g_number}-${Date.now()}.${fileExt}`;
 
-            const { data: uploadData, error: uploadError } =
-                await supabaseCon.supabase.storage
-                    .from("student-ids")
-                    .upload(fileName, studentIdImage, {
-                        cacheControl: "3600",
-                        upsert: false,
-                    });
+            const { data: uploadData, error: uploadError } = await supabaseCon
+                .getClient()
+                .storage.from("student-ids")
+                .upload(fileName, studentIdImage, {
+                    cacheControl: "3600",
+                    upsert: false,
+                });
 
             if (uploadError) throw new Error("Failed to upload ID image");
 
             // Get the public URL
             const {
                 data: { publicUrl },
-            } = supabaseCon.supabase.storage
-                .from("student-ids")
+            } = supabaseCon
+                .getClient()
+                .storage.from("student-ids")
                 .getPublicUrl(fileName);
 
             // Get the session
             const {
                 data: { session },
-            } = await supabaseCon.supabase.auth.getSession();
+            } = await supabaseCon.getClient().auth.getSession();
             if (!session?.access_token) {
                 throw new Error("No valid session found");
             }
@@ -129,14 +130,16 @@ export default function VerifyAccount() {
                 setVerificationError(
                     "Could not verify student ID information. Please ensure the image is clear and contains your ID number and name."
                 );
-                await supabaseCon.supabase.storage
-                    .from("student-ids")
+                await supabaseCon
+                    .getClient()
+                    .storage.from("student-ids")
                     .remove([fileName]);
                 return;
             }
 
             // Store verification record
-            const { error: dbError } = await supabaseCon.supabase
+            const { error: dbError } = await supabaseCon
+                .getClient()
                 .from("verified_ids")
                 .insert([
                     {
@@ -149,8 +152,9 @@ export default function VerifyAccount() {
                 ]);
 
             if (dbError) {
-                await supabaseCon.supabase.storage
-                    .from("student-ids")
+                await supabaseCon
+                    .getClient()
+                    .storage.from("student-ids")
                     .remove([fileName]);
                 throw new Error("Failed to store verification record");
             }

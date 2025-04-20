@@ -1,10 +1,25 @@
-import { createClient } from "@supabase/supabase-js"; // Import the Supabase client library
+import { createClient, SupabaseClient } from "@supabase/supabase-js"; // Import the Supabase client library
+
+interface NotificationResponse {
+    success: boolean;
+    count?: number;
+    error?: string;
+    data?: any;
+}
 
 class SupabaseDbConnection {
+    private supabaseUrl: string;
+    private supabaseKey: string;
+    private supabase: SupabaseClient;
+
     constructor() {
         this.supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-        this.supabaseKey = import.meta.env.VITE_SUPABASE_KEY; // ✅ Updated to match your .env
+        this.supabaseKey = import.meta.env.VITE_SUPABASE_ANON_KEY; // ✅ Updated to match your .env
         this.supabase = createClient(this.supabaseUrl, this.supabaseKey);
+    }
+
+    public getClient(): SupabaseClient {
+        return this.supabase;
     }
 
     async signup(fname, lname, email, gnumber, password) {
@@ -115,56 +130,70 @@ class SupabaseDbConnection {
         }
     }
 
-    // Make supabase storage bucket 
-    // Store url of image in supabase storage bucket
-    // Store url in the `images` column of the `marketplace_items` table
-
-    async listItemsToMarketPlace(name, desc, price, seller_id, condition, category, images) {
-        let itemData = {
-            title: name,
-            description: desc,
-            price: price,
-            seller_id: seller_id,
-            condition: condition,
-            category: category,
-            status: "NA"
-        }
+    async listItemsToMarketPlace(
+        name,
+        desc,
+        price,
+        seller_id,
+        condition,
+        category,
+        images
+    ) {
         try {
-            const stripeID = await this.getSellerStripeID(seller_id)
-            if (!stripeID.success) throw new Error(stripeID.error)
-            itemData.seller_stripe_id = stripeID.data.stripe_account_id
-            const imageUrls = await this.uploadImagesToBucket(images, seller_id);
-            if (!imageUrls.success) throw new Error(imageUrls.error)
-            itemData.images = imageUrls.data
-            const { data, error } = await this.supabase.from('marketplace_items')
-                .insert([itemData])
+            console.log("Starting marketplace listing with parameters:", {
+                title: name,
+                seller_id: seller_id,
+                category: category,
+                images_count: images.length,
+            });
+
+            const imageUrls = await this.uploadImagesToBucket(
+                images,
+                seller_id
+            );
+
+            if (!imageUrls.success) {
+                console.error("Failed to upload images:", imageUrls.error);
+                return {
+                    success: false,
+                    error: "Failed to upload images: " + imageUrls.error,
+                };
+            }
+
+            console.log(
+                "Images uploaded successfully, adding listing to database"
+            );
+
+            const { data, error } = await this.supabase
+                .from("marketplace_items")
+                .insert([
+                    {
+                        title: name,
+                        description: desc,
+                        price: price,
+                        seller_id: seller_id,
+                        condition: condition,
+                        category: category,
+                        images: imageUrls.data,
+                        status: "NA",
+                    },
+                ])
+                .select(); // Add .select() to return the inserted rows
 
             if (error) {
-                console.error('Error inserting marketplace item:', error.message);
+                console.error(
+                    "Error inserting marketplace item:",
+                    error.message
+                );
                 throw new Error(error.message);
             }
 
-            console.log('Marketplace listing successful, data:', data);
-            return { success: true, data: data }
+            console.log("Marketplace listing successful, data:", data);
+            return { success: true, data: data };
         } catch (error) {
             return { success: false, error: error.message };
-            console.error('Error in listItemsToMarketPlace:', error);
-            return { success: false, error: error.message }
-        }
-    }
-
-
-    async getSellerStripeID(seller_id) {
-        try {
-            const { data, error } = await this.supabase.from('user_table')
-                .select('stripe_account_id')
-                .eq('user_id', seller_id)
-                .maybeSingle();
-
-            if (error) throw new Error(error.message);
-            return { success: true, data: data }
-        } catch (error) {
-            return { success: false, error: error.message }
+            console.error("Error in listItemsToMarketPlace:", error);
+            return { success: false, error: error.message };
         }
     }
 
@@ -179,46 +208,60 @@ class SupabaseDbConnection {
         image
     ) {
         try {
-            console.log('Starting service listing with parameters:', {
+            console.log("Starting service listing with parameters:", {
                 title: name,
                 provider_id: providerId,
                 category: category,
-                has_image: !!image
+                has_image: !!image,
             });
 
-            const imageUrl = await this.uploadImagesToBucket([image], providerId);
+            const imageUrl = await this.uploadImagesToBucket(
+                [image],
+                providerId
+            );
 
             if (!imageUrl.success) {
-                console.error('Failed to upload service image:', imageUrl.error);
-                return { success: false, error: 'Failed to upload image: ' + imageUrl.error };
+                console.error(
+                    "Failed to upload service image:",
+                    imageUrl.error
+                );
+                return {
+                    success: false,
+                    error: "Failed to upload image: " + imageUrl.error,
+                };
             }
 
-            console.log('Image uploaded successfully, adding service to database');
+            console.log(
+                "Image uploaded successfully, adding service to database"
+            );
 
-            const { data, error } = await this.supabase.from('services_table')
-                .insert([{
-                    title: name,
-                    description: desc,
-                    rate: rate,
-                    rateType: rateType,
-                    category: category,
-                    provider_id: providerId,
-                    availability: availability,
-                    image: imageUrl.data[0]
-                }])
+            const { data, error } = await this.supabase
+                .from("services_table")
+                .insert([
+                    {
+                        title: name,
+                        description: desc,
+                        rate: rate,
+                        rateType: rateType,
+                        category: category,
+                        provider_id: providerId,
+                        availability: availability,
+                        image: imageUrl.data[0],
+                    },
+                ])
                 .select(); // Add .select() to return the inserted rows
 
             if (error) {
-                console.error('Error inserting service:', error.message);
+                console.error("Error inserting service:", error.message);
                 throw new Error(error.message);
             }
 
-            console.log('Service listing successful, data:', data);
-            return { success: true, data: data }
+            console.log("Service listing successful, data:", data);
+            return { success: true, data: data };
         } catch (error) {
             return { success: false, error: error.message };
-            console.error('Error in listServices:', error);
-            return { success: false, error: error.message }
+            console.error("Error in listServices:", error);
+            return { success: false, error: error.message };
         }
     }
 
@@ -291,40 +334,16 @@ class SupabaseDbConnection {
         }
     }
 
-    // async checkSellerStatus(userId) {
-    //     try {
-    //         const { data, error } = await this.supabase
-    //             .from('user_table')
-    //             .select('stripe_account_id, stripe_account_status')
-    //             .eq('user_id', userId)
-    //             .maybeSingle();
-
-    //         if (error) {
-    //             throw new Error(error.message);
-    //         }
-
-    //         if (!data || !data.stripe_account_id || data.stripe_account_status !== 'complete') {
-    //             return false;
-    //         }
-    //         return true;
-    //     } catch (err) {
-    //         console.error("Error checking seller status:", err.message);
-    //         return null;
-    //     }
-
-    // }
-
-
     async sendMessage(senderId, receiverId, content) {
         try {
             // Ensure both IDs are strings
             const senderIdStr = String(senderId);
             const receiverIdStr = String(receiverId);
 
-            console.log('Sending message with parameters:', {
+            console.log("Sending message with parameters:", {
                 sender_id: senderIdStr,
                 receiver_id: receiverIdStr,
-                content: content
+                content: content,
             });
 
             const { data, error } = await this.supabase
@@ -334,11 +353,11 @@ class SupabaseDbConnection {
                         sender_id: senderIdStr,
                         receiver_id: receiverIdStr,
                         content: content,
-                    }
+                    },
                 ]);
 
             if (error) {
-                console.error('Error sending message:', error.message);
+                console.error("Error sending message:", error.message);
                 return { success: false, error: error.message };
             }
 
@@ -348,8 +367,11 @@ class SupabaseDbConnection {
                 success: false,
                 error: "Unexpected error. Please try again.",
             };
-            console.error('Unexpected error in sendMessage:', err);
-            return { success: false, error: "Unexpected error. Please try again." };
+            console.error("Unexpected error in sendMessage:", err);
+            return {
+                success: false,
+                error: "Unexpected error. Please try again.",
+            };
         }
     }
 
@@ -359,44 +381,56 @@ class SupabaseDbConnection {
             const userAStr = String(userA);
             const userBStr = String(userB);
 
-            console.log('Fetching messages between users:', {
+            console.log("Fetching messages between users:", {
                 userA: userAStr,
-                userB: userBStr
+                userB: userBStr,
             });
 
             // First query: messages from userA to userB
             const { data: sentMessages, error: sentError } = await this.supabase
-                .from('Messages')
-                .select('*')
-                .eq('sender_id', userAStr)
-                .eq('receiver_id', userBStr);
+                .from("Messages")
+                .select("*")
+                .eq("sender_id", userAStr)
+                .eq("receiver_id", userBStr);
 
             if (sentError) {
-                console.error('Error fetching sent messages:', sentError.message);
+                console.error(
+                    "Error fetching sent messages:",
+                    sentError.message
+                );
                 return { success: false, error: sentError.message };
             }
 
             // Second query: messages from userB to userA
-            const { data: receivedMessages, error: receivedError } = await this.supabase
-                .from('Messages')
-                .select('*')
-                .eq('sender_id', userBStr)
-                .eq('receiver_id', userAStr);
+            const { data: receivedMessages, error: receivedError } =
+                await this.supabase
+                    .from("Messages")
+                    .select("*")
+                    .eq("sender_id", userBStr)
+                    .eq("receiver_id", userAStr);
 
             if (receivedError) {
-                console.error('Error fetching received messages:', receivedError.message);
+                console.error(
+                    "Error fetching received messages:",
+                    receivedError.message
+                );
                 return { success: false, error: receivedError.message };
             }
 
             // Combine and sort the messages
             const allMessages = [...sentMessages, ...receivedMessages].sort(
-                (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+                (a, b) =>
+                    new Date(a.created_at).getTime() -
+                    new Date(b.created_at).getTime()
             );
 
             return { success: true, messages: allMessages };
         } catch (err) {
-            console.error('Unexpected error in getMessages:', err);
-            return { success: false, error: "Unexpected error while fetching messages." };
+            console.error("Unexpected error in getMessages:", err);
+            return {
+                success: false,
+                error: "Unexpected error while fetching messages.",
+            };
         }
     }
     // Fetch recent conversations for the logged-in user
@@ -405,15 +439,18 @@ class SupabaseDbConnection {
             // Ensure ID is a string
             const currentUserIdStr = String(currentUserId);
 
-            console.log('🔍 getConversations - Looking for conversations for user:', currentUserIdStr);
+            console.log(
+                "🔍 getConversations - Looking for conversations for user:",
+                currentUserIdStr
+            );
 
             // Debug: Check if the Messages table exists and has right structure
             const { data: tableInfo, error: tableError } = await this.supabase
-                .from('Messages')
-                .select('count(*)', { count: 'exact' })
+                .from("Messages")
+                .select("count(*)", { count: "exact" })
                 .limit(1);
 
-            console.log('🔍 Messages table check:', { tableInfo, tableError });
+            console.log("🔍 Messages table check:", { tableInfo, tableError });
 
             // Fetch all messages where currentUserId is sender
             const { data: sentMessages, error: sentError } = await this.supabase
@@ -421,31 +458,38 @@ class SupabaseDbConnection {
                 .select("sender_id, receiver_id, content, created_at")
                 .eq("sender_id", currentUserIdStr);
 
-            console.log('📤 Sent messages:', {
+            console.log("📤 Sent messages:", {
                 count: sentMessages?.length || 0,
                 messages: sentMessages,
-                error: sentError
+                error: sentError,
             });
 
             if (sentError) {
-                console.error('❌ Error fetching sent messages:', sentError.message);
+                console.error(
+                    "❌ Error fetching sent messages:",
+                    sentError.message
+                );
                 throw new Error(sentError.message);
             }
 
             // Fetch all messages where currentUserId is receiver
-            const { data: receivedMessages, error: receivedError } = await this.supabase
-                .from("Messages")
-                .select("sender_id, receiver_id, content, created_at")
-                .eq("receiver_id", currentUserIdStr);
+            const { data: receivedMessages, error: receivedError } =
+                await this.supabase
+                    .from("Messages")
+                    .select("sender_id, receiver_id, content, created_at")
+                    .eq("receiver_id", currentUserIdStr);
 
-            console.log('📥 Received messages:', {
+            console.log("📥 Received messages:", {
                 count: receivedMessages?.length || 0,
                 messages: receivedMessages,
-                error: receivedError
+                error: receivedError,
             });
 
             if (receivedError) {
-                console.error('❌ Error fetching received messages:', receivedError.message);
+                console.error(
+                    "❌ Error fetching received messages:",
+                    receivedError.message
+                );
                 throw new Error(receivedError.message);
             }
 
@@ -453,20 +497,23 @@ class SupabaseDbConnection {
             const partnerIds = new Set();
 
             // From sent messages, add receivers
-            sentMessages.forEach(msg => {
+            sentMessages.forEach((msg) => {
                 partnerIds.add(msg.receiver_id);
             });
 
             // From received messages, add senders
-            receivedMessages.forEach(msg => {
+            receivedMessages.forEach((msg) => {
                 partnerIds.add(msg.sender_id);
             });
 
             const uniqueIds = Array.from(partnerIds);
-            console.log('👥 Unique conversation partners found:', uniqueIds);
+            console.log("👥 Unique conversation partners found:", uniqueIds);
 
             if (uniqueIds.length === 0) {
-                console.log('ℹ️ No conversation partners found for user:', currentUserIdStr);
+                console.log(
+                    "ℹ️ No conversation partners found for user:",
+                    currentUserIdStr
+                );
                 return { success: true, data: [] };
             }
 
@@ -476,20 +523,23 @@ class SupabaseDbConnection {
                 .select("user_id, first_name, last_name")
                 .in("user_id", uniqueIds);
 
-            console.log('👤 Conversation partners info:', {
+            console.log("👤 Conversation partners info:", {
                 count: users?.length || 0,
                 users,
-                error: userError
+                error: userError,
             });
 
             if (userError) {
-                console.error('❌ Error fetching user info:', userError.message);
+                console.error(
+                    "❌ Error fetching user info:",
+                    userError.message
+                );
                 throw new Error(userError.message);
             }
 
             return { success: true, data: users };
         } catch (error) {
-            console.error('❌ Unexpected error in getConversations:', error);
+            console.error("❌ Unexpected error in getConversations:", error);
             return { success: false, error: error.message };
         }
     }
@@ -498,47 +548,66 @@ class SupabaseDbConnection {
     async addNotification(userId, type, title, message, relatedId = null) {
         try {
             if (!userId) {
-                console.error('Missing userId in addNotification', { userId, type, title });
-                return { success: false, error: 'Missing user ID' };
+                console.error("Missing userId in addNotification", {
+                    userId,
+                    type,
+                    title,
+                });
+                return { success: false, error: "Missing user ID" };
             }
 
             const userIdStr = String(userId);
 
-            console.log('Adding notification with parameters:', {
+            console.log("Adding notification with parameters:", {
                 user_id: userIdStr,
                 type,
                 title,
                 message,
-                relatedId
+                relatedId,
             });
 
             try {
                 const { data, error } = await this.supabase
-                    .from('Notifications')
-                    .insert([{
-                        user_id: userIdStr,
-                        type: type, // 'message', 'listing', 'purchase', 'sale', 'booking'
-                        title: title,
-                        message: message,
-                        related_id: relatedId,
-                        read: false,
-                        created_at: new Date()
-                    }]);
+                    .from("Notifications")
+                    .insert([
+                        {
+                            user_id: userIdStr,
+                            type: type, // 'message', 'listing', 'purchase', 'sale', 'booking'
+                            title: title,
+                            message: message,
+                            related_id: relatedId,
+                            read: false,
+                            created_at: new Date(),
+                        },
+                    ]);
 
                 if (error) {
-                    console.error('Error adding notification to database:', error.message, error);
+                    console.error(
+                        "Error adding notification to database:",
+                        error.message,
+                        error
+                    );
                     return { success: false, error: error.message };
                 }
 
-                console.log('Notification added successfully:', data);
+                console.log("Notification added successfully:", data);
                 return { success: true, data };
             } catch (dbError) {
-                console.error('Database error when adding notification:', dbError);
-                return { success: false, error: 'Database error: ' + dbError.message };
+                console.error(
+                    "Database error when adding notification:",
+                    dbError
+                );
+                return {
+                    success: false,
+                    error: "Database error: " + dbError.message,
+                };
             }
         } catch (err) {
-            console.error('Unexpected error adding notification:', err);
-            return { success: false, error: "Unexpected error. Please try again." };
+            console.error("Unexpected error adding notification:", err);
+            return {
+                success: false,
+                error: "Unexpected error. Please try again.",
+            };
         }
     }
 
@@ -547,124 +616,206 @@ class SupabaseDbConnection {
         try {
             const userIdStr = String(userId);
 
-            console.log('Fetching notifications for user:', userIdStr);
+            console.log("Fetching notifications for user:", userIdStr);
 
             const { data, error } = await this.supabase
-                .from('Notifications')
-                .select('*')
-                .eq('user_id', userIdStr)
-                .order('created_at', { ascending: false });
+                .from("Notifications")
+                .select("*")
+                .eq("user_id", userIdStr)
+                .order("created_at", { ascending: false });
 
             if (error) {
-                console.error('Error fetching notifications:', error.message);
+                console.error("Error fetching notifications:", error.message);
                 return { success: false, error: error.message };
             }
 
             return { success: true, data };
         } catch (err) {
-            console.error('Unexpected error fetching notifications:', err);
-            return { success: false, error: "Unexpected error while fetching notifications." };
-        }
-    }
-
-    // Mark a notification as read
-    async markNotificationRead(notificationId, isRead = true) {
-        try {
-            const { data, error } = await this.supabase
-                .from('Notifications')
-                .update({ read: isRead })
-                .eq('id', notificationId);
-
-            if (error) {
-                console.error('Error updating notification:', error.message);
-                return { success: false, error: error.message };
-            }
-
-            return { success: true, data };
-        } catch (err) {
+            console.error("Unexpected error fetching notifications:", err);
             return {
                 success: false,
-                error: "Unexpected error while fetching messages.",
+                error: "Unexpected error while fetching notifications.",
             };
         }
     }
 
+    // Mark a notification as read
+    async markNotificationRead(
+        notificationId: string,
+        isRead = true
+    ): Promise<NotificationResponse> {
+        try {
+            const { data, error } = await this.supabase
+                .from("Notifications")
+                .update({ read: isRead })
+                .eq("id", notificationId);
+
+            if (error) {
+                console.error("Error updating notification:", error.message);
+                return { success: false, error: error.message };
+            }
+
+            return { success: true, data };
+        } catch (error) {
+            console.error("Unexpected error updating notification:", error);
+            return {
+                success: false,
+                error: "Unexpected error. Please try again.",
+            };
+        }
+    }
 
     // Get unread notification count for a user
-    getUnreadNotificationCount = async (userId) => {
+    async getUnreadNotificationCount(
+        userId: string
+    ): Promise<NotificationResponse> {
         try {
             const userIdStr = String(userId);
 
             const { data, error, count } = await this.supabase
-                .from('Notifications')
-                .select('*', { count: 'exact' })
-                .eq('user_id', userIdStr)
-                .eq('read', false);
+                .from("Notifications")
+                .select("*", { count: "exact" })
+                .eq("user_id", userIdStr)
+                .eq("read", false);
 
             if (error) {
-                console.error('Error counting notifications:', error.message);
+                console.error("Error counting notifications:", error.message);
                 return { success: false, error: error.message };
             }
 
             return { success: true, count };
-        } catch (err) {
-            console.error('Unexpected error counting notifications:', err);
-            return { success: false, error: "Unexpected error while counting notifications." };
+        } catch (error) {
+            console.error("Unexpected error counting notifications:", error);
+            return {
+                success: false,
+                error: "Unexpected error while counting notifications.",
+            };
         }
     }
 
     // Helper: Create a message notification
-    async createMessageNotification(receiverId, senderId, senderName) {
-        console.log('Creating message notification with params:', { receiverId, senderId, senderName });
+    async createMessageNotification(
+        receiverId: string,
+        senderId: string,
+        senderName: string
+    ): Promise<NotificationResponse> {
+        console.log("Creating message notification with params:", {
+            receiverId,
+            senderId,
+            senderName,
+        });
 
         if (!receiverId || !senderId) {
-            console.error('Missing required parameters for createMessageNotification', { receiverId, senderId });
-            return { success: false, error: 'Missing required parameters' };
+            console.error(
+                "Missing required parameters for createMessageNotification",
+                { receiverId, senderId }
+            );
+            return { success: false, error: "Missing required parameters" };
         }
 
         const title = "New Message";
         const message = `You have a new message from ${senderName}`;
-        return this.addNotification(receiverId, 'message', title, message, senderId);
+        return this.addNotification(
+            receiverId,
+            "message",
+            title,
+            message,
+            senderId
+        );
     }
 
     // Helper: Create a new listing notification
-    async createNewListingNotification(ownerId, listingId, listingTitle) {
+    async createNewListingNotification(
+        ownerId: string,
+        listingId: string,
+        listingTitle: string
+    ): Promise<NotificationResponse> {
         const title = "Listing Published";
         const message = `Your item "${listingTitle}" has been successfully listed for sale`;
-        return this.addNotification(ownerId, 'listing', title, message, listingId);
+        return this.addNotification(
+            ownerId,
+            "listing",
+            title,
+            message,
+            listingId
+        );
     }
 
     // Helper: Create a new service notification
-    async createNewServiceNotification(providerId, serviceId, serviceTitle) {
+    async createNewServiceNotification(
+        providerId: string,
+        serviceId: string,
+        serviceTitle: string
+    ): Promise<NotificationResponse> {
         const title = "Service Published";
         const message = `Your service "${serviceTitle}" has been successfully listed`;
-        return this.addNotification(providerId, 'service', title, message, serviceId);
+        return this.addNotification(
+            providerId,
+            "service",
+            title,
+            message,
+            serviceId
+        );
     }
 
     // Helper: Create a purchase notification
-    async createPurchaseNotification(buyerId, sellerId, orderId, itemTitle) {
+    async createPurchaseNotification(
+        buyerId: string,
+        sellerId: string,
+        orderId: string,
+        itemTitle: string
+    ): Promise<NotificationResponse> {
         // Notify buyer
         const buyerTitle = "Purchase Successful";
         const buyerMessage = `You have successfully purchased "${itemTitle}"`;
-        await this.addNotification(buyerId, 'purchase', buyerTitle, buyerMessage, orderId);
+        await this.addNotification(
+            buyerId,
+            "purchase",
+            buyerTitle,
+            buyerMessage,
+            orderId
+        );
 
         // Notify seller
         const sellerTitle = "Item Sold";
         const sellerMessage = `Your item "${itemTitle}" has been purchased`;
-        return this.addNotification(sellerId, 'sale', sellerTitle, sellerMessage, orderId);
+        return this.addNotification(
+            sellerId,
+            "sale",
+            sellerTitle,
+            sellerMessage,
+            orderId
+        );
     }
 
     // Helper: Create a booking notification
-    async createBookingNotification(userId, providerId, bookingId, serviceTitle) {
+    async createBookingNotification(
+        userId: string,
+        providerId: string,
+        bookingId: string,
+        serviceTitle: string
+    ): Promise<NotificationResponse> {
         // Notify user who booked
         const userTitle = "Booking Confirmed";
         const userMessage = `Your booking for "${serviceTitle}" has been confirmed`;
-        await this.addNotification(userId, 'booking', userTitle, userMessage, bookingId);
+        await this.addNotification(
+            userId,
+            "booking",
+            userTitle,
+            userMessage,
+            bookingId
+        );
 
         // Notify service provider
         const providerTitle = "New Booking";
         const providerMessage = `Someone has booked your service "${serviceTitle}"`;
-        return this.addNotification(providerId, 'booking', providerTitle, providerMessage, bookingId);
+        return this.addNotification(
+            providerId,
+            "booking",
+            providerTitle,
+            providerMessage,
+            bookingId
+        );
     }
 }
 

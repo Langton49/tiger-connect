@@ -39,20 +39,20 @@ export default function Checkout() {
     cardName: "",
   });
 
-  const supabase = createClient(
-    import.meta.env.VITE_SUPABASE_URL,
-    import.meta.env.VITE_SUPABASE_KEY
-  );
+    const supabase = createClient(
+        import.meta.env.VITE_SUPABASE_URL,
+        import.meta.env.VITE_SUPABASE_KEY
+    );
 
-  const handleInputChange = (
-    e: React.ChangeEvent<HTMLInputElement>,
-    field: keyof FormData
-  ) => {
-    setFormData((prev) => ({
-      ...prev,
-      [field]: e.target.value,
-    }));
-  };
+    const handleInputChange = (
+        e: React.ChangeEvent<HTMLInputElement>,
+        field: keyof FormData
+    ) => {
+        setFormData((prev) => ({
+            ...prev,
+            [field]: e.target.value,
+        }));
+    };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -68,83 +68,115 @@ export default function Checkout() {
 
     setIsProcessing(true);
 
-    try {
-      const { data: paymentIntentData, error: intentError } =
-        await supabase.functions.invoke("create-payment-intent", {
-          body: JSON.stringify({
-            amount: Math.round(totalPrice * 100),
-            metadata: {
-              customer_name: `${formData.firstName} ${formData.lastName}`,
-              customer_email: formData.email,
-              shipping_address: `${formData.address}, ${formData.city}, ${formData.state} ${formData.zipCode}`,
-              items: JSON.stringify(
-                items.map((item) => ({
-                  id: item.item.id,
-                  seller_stripe_id: item.item.seller_stripe_id,
-                  quantity: item.quantity,
-                  totalPrice: item.item.price * item.quantity,
-                }))
-              ),
-            },
-          }),
-        });
+        try {
+            const { data: paymentIntentData, error: intentError } =
+                await supabase.functions.invoke("create-payment-intent", {
+                    body: JSON.stringify({
+                        amount: Math.round(totalPrice * 100),
+                        metadata: {
+                            customer_name: `${formData.firstName} ${formData.lastName}`,
+                            customer_email: formData.email,
+                            shipping_address: `${formData.address}, ${formData.city}, ${formData.state} ${formData.zipCode}`,
+                            items: JSON.stringify(
+                                items.map((item) => ({
+                                    id: item.item.id,
+                                    seller_stripe_id:
+                                        item.item.seller_stripe_id,
+                                    quantity: item.quantity,
+                                    totalPrice: item.item.price * item.quantity,
+                                }))
+                            ),
+                        },
+                    }),
+                });
 
-      if (intentError || !paymentIntentData?.clientSecret) {
-        throw new Error(
-          intentError?.message || "Failed to create payment intent"
-        );
-      }
+            if (intentError || !paymentIntentData?.clientSecret) {
+                throw new Error(
+                    intentError?.message || "Failed to create payment intent"
+                );
+            }
 
-      const { error: confirmError, paymentIntent } =
-        await stripe.confirmCardPayment(paymentIntentData.clientSecret, {
-          payment_method: {
-            card: elements.getElement(CardElement)!,
-            billing_details: {
-              name: formData.cardName,
-              email: formData.email,
-              address: {
-                line1: formData.address,
-                city: formData.city,
-                state: formData.state,
-                postal_code: formData.zipCode,
-                country: "US",
-              },
-            },
-          },
-        });
+            const { error: confirmError, paymentIntent } =
+                await stripe.confirmCardPayment(
+                    paymentIntentData.clientSecret,
+                    {
+                        payment_method: {
+                            card: elements.getElement(CardElement)!,
+                            billing_details: {
+                                name: formData.cardName,
+                                email: formData.email,
+                                address: {
+                                    line1: formData.address,
+                                    city: formData.city,
+                                    state: formData.state,
+                                    postal_code: formData.zipCode,
+                                    country: "US",
+                                },
+                            },
+                        },
+                    }
+                );
 
-      if (confirmError) {
-        throw new Error(confirmError.message);
-      }
+            if (confirmError) {
+                throw new Error(confirmError.message);
+            }
 
-      if (paymentIntent?.status === "succeeded") {
-        const { data: userData } = await supabase.auth.getUser();
-        const customerId = userData.user?.id || null;
+            if (paymentIntent?.status === "succeeded") {
+                const { data: userData } = await supabase.auth.getUser();
+                const customerId = userData.user?.id || null;
 
-        const { error: orderError } = await supabase.from("orders").insert({
-          payment_intent_id: paymentIntent.id,
-          amount: totalPrice,
-          status: "processing",
-          user_id: customerId,
-          items: items.map((item) => ({
-            product_id: item.item.id,
-            seller_id: item.item.seller_id,
-            quantity: item.quantity,
-            price: item.item.price,
-          })),
-        });
+                const { error: orderError } = await supabase
+                    .from("orders")
+                    .insert({
+                        payment_intent_id: paymentIntent.id,
+                        amount: totalPrice,
+                        status: "processing",
+                        user_id: customerId,
+                        items: items.map((item) => ({
+                            product_id: item.item.id,
+                            seller_id: item.item.seller_id,
+                            quantity: item.quantity,
+                            price: item.item.price,
+                        })),
+                    });
 
-        if (orderError) {
-          console.error("Order creation error:", orderError);
-          throw new Error("Failed to create order");
+                if (orderError) {
+                    console.error("Order creation error:", orderError);
+                    throw new Error("Failed to create order");
+                }
+
+                await supabase.functions.invoke("process-seller-payouts", {
+                    body: JSON.stringify({
+                        payment_intent_id: paymentIntent.id,
+                    }),
+                });
+
+                clearCart();
+                toast({
+                    title: "Payment succeeded!",
+                    description: "Thank you for your purchase.",
+                });
+                navigate("/order-success", {
+                    state: {
+                        paymentId: paymentIntent.id,
+                        amount: totalPrice,
+                    },
+                });
+            }
+        } catch (error) {
+            console.error("Payment error:", error);
+            toast({
+                title: "Payment failed",
+                description:
+                    error instanceof Error
+                        ? error.message
+                        : "An unknown error occurred",
+                variant: "destructive",
+            });
+        } finally {
+            setIsProcessing(false);
         }
-
-        await supabase.functions.invoke("process-seller-payouts", {
-          body: JSON.stringify({
-            payment_intent_id: paymentIntent.id,
-          }),
-        });
-
+    };
         clearCart();
         toast({
           title: "Payment succeeded!",
@@ -281,16 +313,33 @@ export default function Checkout() {
                     </div>
                   </div>
 
-                  <div className="space-y-2">
-                    <Label htmlFor="cardName">Name on Card</Label>
-                    <Input
-                      id="cardName"
-                      value={formData.cardName}
-                      onChange={(e) => handleInputChange(e, "cardName")}
-                      required
-                    />
-                  </div>
+                                    <div className="space-y-2">
+                                        <Label htmlFor="cardName">
+                                            Name on Card
+                                        </Label>
+                                        <Input
+                                            id="cardName"
+                                            value={formData.cardName}
+                                            onChange={(e) =>
+                                                handleInputChange(e, "cardName")
+                                            }
+                                            required
+                                        />
+                                    </div>
 
+                                    <Button
+                                        type="submit"
+                                        className="w-full bg-grambling-gold hover:bg-grambling-gold/90 text-grambling-black"
+                                        disabled={!stripe || isProcessing}
+                                    >
+                                        {isProcessing
+                                            ? "Processing..."
+                                            : "Place Order"}
+                                    </Button>
+                                </form>
+                            </CardContent>
+                        </Card>
+                    </div>
                   <Button
                     type="submit"
                     className="w-full bg-grambling-gold hover:bg-grambling-gold/90 text-grambling-black"
