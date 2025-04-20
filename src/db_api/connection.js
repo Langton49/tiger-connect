@@ -305,25 +305,6 @@ class SupabaseDbConnection {
         }
     }
 
-    // Get all messages between two users
-    async getMessages(userA, userB) {
-        try {
-            const { data, error } = await this.supabase
-                .from('messages')
-                .select('*')
-                .or(`and(sender_id.eq.${userA},receiver_id.eq.${userB}),and(sender_id.eq.${userB},receiver_id.eq.${userA})`)
-                .order('created_at', { ascending: true });
-
-            if (error) {
-                return { success: false, error: error.message };
-            }
-
-            return { success: true, messages: data };
-        } catch (err) {
-            return { success: false, error: "Unexpected error while fetching messages." };
-        }
-    }
-
     async checkSellerStatus(userId) {
         try {
             const { data, error } = await this.supabase
@@ -347,39 +328,24 @@ class SupabaseDbConnection {
 
     }
 
+    // Get all messages between two users
+    async getMessages(userA, userB) {
+        try {
+            const { data, error } = await this.supabase
+                .from('messages')
+                .select('*')
+                .or(`and(sender_id.eq.${userA},receiver_id.eq.${userB}),and(sender_id.eq.${userB},receiver_id.eq.${userA})`)
+                .order('created_at', { ascending: true });
 
-    // async createPaymentIntent(amount, formData) {
-    //     try {
-    //         const { data: paymentIntentData, error: intentError } =
-    //             await supabase.functions.invoke("create-payment-intent", {
-    //                 body: JSON.stringify({
-    //                     amount: Math.round(amount * 100),
-    //                     metadata: {
-    //                         customer_name: `${formData.firstName} ${formData.lastName}`,
-    //                         customer_email: formData.email,
-    //                         shipping_address: `${formData.address}, ${formData.city}, ${formData.state} ${formData.zipCode}`,
-    //                         items: JSON.stringify(
-    //                             items.map((item) => ({
-    //                                 id: item.item.id,
-    //                                 quantity: item.quantity,
-    //                             }))
-    //                         ),
-    //                     },
-    //                 }),
-    //             });
+            if (error) {
+                return { success: false, error: error.message };
+            }
 
-    //         if (intentError || !paymentIntentData?.clientSecret) {
-    //             throw new Error(
-    //                 intentError?.message || "Failed to create payment intent"
-    //             );
-    //         }
-
-    //         return { success: true, data: paymentIntentData.clientSecret }
-    //     } catch (error) {
-    //         return { success: false, error: error.message }
-    //     }
-
-    // }
+            return { success: true, messages: data };
+        } catch (err) {
+            return { success: false, error: "Unexpected error while fetching messages." };
+        }
+    }
 
 }
 // Export the Supabase connection instance
