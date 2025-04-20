@@ -126,11 +126,24 @@ export default function Checkout() {
           amount: totalPrice,
           status: "processing",
           user_id: customerId,
+          items: items.map((item) => ({
+            product_id: item.item.id,
+            seller_id: item.item.seller_id,
+            quantity: item.quantity,
+            price: item.item.price,
+          })),
         });
 
         if (orderError) {
           console.error("Order creation error:", orderError);
+          throw new Error("Failed to create order");
         }
+
+        await supabase.functions.invoke("process-seller-payouts", {
+          body: JSON.stringify({
+            payment_intent_id: paymentIntent.id,
+          }),
+        });
 
         clearCart();
         toast({
