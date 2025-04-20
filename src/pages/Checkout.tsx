@@ -80,7 +80,9 @@ export default function Checkout() {
               items: JSON.stringify(
                 items.map((item) => ({
                   id: item.item.id,
+                  seller_stripe_id: item.item.seller_stripe_id,
                   quantity: item.quantity,
+                  totalPrice: item.item.price * item.quantity,
                 }))
               ),
             },
