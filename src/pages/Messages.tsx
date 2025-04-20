@@ -18,22 +18,39 @@ export default function MessagesPage() {
   };
 
   const handleSend = async () => {
-    if (!messageText.trim() || !receiverId) return;
+    if (!messageText.trim() || !receiverId) {
+      console.warn("Cannot send message: empty message or missing receiver ID");
+      return;
+    }
+    
+    if (!currentUser?.user_id) {
+      console.error("Cannot send message: User not authenticated");
+      alert("You must be logged in to send messages");
+      return;
+    }
+    
     console.log("SENDING MESSAGE", {
-      sender: currentUser?.user_id,
+      sender: currentUser.user_id,
       receiver: receiverId,
       content: messageText,
     });
-    const receiver = String(receiverId);
-    const res = await supabaseCon.sendMessage(currentUser.user_id, receiver, messageText);
-    if (res.success) {
-      setMessageText("");
-      fetchMessages();
-    }
-    if (!res.success) {
-      alert("Message failed to send: " + res.error);
-    }
     
+    try {
+      const receiver = String(receiverId);
+      const res = await supabaseCon.sendMessage(currentUser.user_id, receiver, messageText);
+      
+      if (res.success) {
+        console.log("Message sent successfully");
+        setMessageText("");
+        await fetchMessages(); // Use await to ensure messages are fetched before updating UI
+      } else {
+        console.error("Failed to send message:", res.error);
+        alert("Message failed to send: " + res.error);
+      }
+    } catch (err) {
+      console.error("Exception when sending message:", err);
+      alert("An unexpected error occurred. Please try again.");
+    }
   };
 
 

@@ -266,22 +266,34 @@ class SupabaseDbConnection {
     // Send a new message
     async sendMessage(senderId, receiverId, content) {
         try {
+            // Ensure both IDs are strings
+            const senderIdStr = String(senderId);
+            const receiverIdStr = String(receiverId);
+            
+            console.log('Sending message with parameters:', {
+                sender_id: senderIdStr,
+                receiver_id: receiverIdStr,
+                content: content
+            });
+            
             const { data, error } = await this.supabase
                 .from('Messages')
                 .insert([
                     {
-                        sender_id: senderId,
-                        receiver_id: receiverId,
+                        sender_id: senderIdStr,
+                        receiver_id: receiverIdStr,
                         content: content,
                     }
                 ]);
 
             if (error) {
+                console.error('Error sending message:', error.message);
                 return { success: false, error: error.message };
             }
 
             return { success: true, data };
         } catch (err) {
+            console.error('Unexpected error in sendMessage:', err);
             return { success: false, error: "Unexpected error. Please try again." };
         }
     }
@@ -289,58 +301,116 @@ class SupabaseDbConnection {
     // Get all messages between two users
     async getMessages(userA, userB) {
         try {
-        const { data, error } = await this.supabase
-            .from('Messages')
-            .select('*')
-            .or(`and(sender_id.eq.${userA},receiver_id.eq.${userB}),and(sender_id.eq.${userB},receiver_id.eq.${userA})`)
-            .order('created_at', { ascending: true });
-    
-        if (error) {
-            return { success: false, error: error.message };
-        }
-    
-        return { success: true, messages: data };
+            // Ensure both IDs are strings
+            const userAStr = String(userA);
+            const userBStr = String(userB);
+            
+            console.log('Fetching messages between users:', {
+                userA: userAStr,
+                userB: userBStr
+            });
+            
+            // First query: messages from userA to userB
+            const { data: sentMessages, error: sentError } = await this.supabase
+                .from('Messages')
+                .select('*')
+                .eq('sender_id', userAStr)
+                .eq('receiver_id', userBStr);
+            
+            if (sentError) {
+                console.error('Error fetching sent messages:', sentError.message);
+                return { success: false, error: sentError.message };
+            }
+            
+            // Second query: messages from userB to userA
+            const { data: receivedMessages, error: receivedError } = await this.supabase
+                .from('Messages')
+                .select('*')
+                .eq('sender_id', userBStr)
+                .eq('receiver_id', userAStr);
+            
+            if (receivedError) {
+                console.error('Error fetching received messages:', receivedError.message);
+                return { success: false, error: receivedError.message };
+            }
+            
+            // Combine and sort the messages
+            const allMessages = [...sentMessages, ...receivedMessages].sort(
+                (a, b) => new Date(a.created_at) - new Date(b.created_at)
+            );
+            
+            return { success: true, messages: allMessages };
         } catch (err) {
-        return { success: false, error: "Unexpected error while fetching messages." };
+            console.error('Unexpected error in getMessages:', err);
+            return { success: false, error: "Unexpected error while fetching messages." };
         }
     }
     // Fetch recent conversations for the logged-in user
     async getConversations(currentUserId) {
-    try {
-        // Fetch all messages where currentUserId is sender or receiver
-        const { data: messages, error } = await this.supabase
-            .from("Messages")
-            .select("sender_id, receiver_id")
-            .or(`sender_id.eq.${currentUserId},receiver_id.eq.${currentUserId}`);
+        try {
+            // Ensure ID is a string
+            const currentUserIdStr = String(currentUserId);
+            
+            console.log('Fetching conversations for user:', currentUserIdStr);
+            
+            // Fetch all messages where currentUserId is sender
+            const { data: sentMessages, error: sentError } = await this.supabase
+                .from("Messages")
+                .select("sender_id, receiver_id")
+                .eq("sender_id", currentUserIdStr);
 
-        if (error) throw new Error(error.message);
+            if (sentError) {
+                console.error('Error fetching sent messages:', sentError.message);
+                throw new Error(sentError.message);
+            }
 
-        // Extract conversation partners
-        const partnerIds = new Set();
-        messages.forEach(msg => {
-            if (msg.sender_id !== currentUserId) partnerIds.add(msg.sender_id);
-            if (msg.receiver_id !== currentUserId) partnerIds.add(msg.receiver_id);
-        });
+            // Fetch all messages where currentUserId is receiver
+            const { data: receivedMessages, error: receivedError } = await this.supabase
+                .from("Messages")
+                .select("sender_id, receiver_id")
+                .eq("receiver_id", currentUserIdStr);
 
-        const uniqueIds = Array.from(partnerIds);
+            if (receivedError) {
+                console.error('Error fetching received messages:', receivedError.message);
+                throw new Error(receivedError.message);
+            }
 
-        if (uniqueIds.length === 0) {
-            return { success: true, data: [] };
+            // Extract conversation partners
+            const partnerIds = new Set();
+            
+            // From sent messages, add receivers
+            sentMessages.forEach(msg => {
+                partnerIds.add(msg.receiver_id);
+            });
+            
+            // From received messages, add senders
+            receivedMessages.forEach(msg => {
+                partnerIds.add(msg.sender_id);
+            });
+
+            const uniqueIds = Array.from(partnerIds);
+
+            if (uniqueIds.length === 0) {
+                return { success: true, data: [] };
+            }
+
+            // Fetch their info from user_table
+            const { data: users, error: userError } = await this.supabase
+                .from("user_table")
+                .select("user_id, first_name, last_name, email")
+                .in("user_id", uniqueIds);
+
+            if (userError) {
+                console.error('Error fetching user info:', userError.message);
+                throw new Error(userError.message);
+            }
+
+            return { success: true, data: users };
+        } catch (error) {
+            console.error('Unexpected error in getConversations:', error);
+            return { success: false, error: error.message };
         }
-
-        // Fetch their info from user_table
-        const { data: users, error: userError } = await this.supabase
-            .from("user_table")
-            .select("user_id, first_name, last_name, email")
-            .in("user_id", uniqueIds);
-
-        if (userError) throw new Error(userError.message);
-
-        return { success: true, data: users };
-    } catch (error) {
-        return { success: false, error: error.message };
     }
-}
 
 }
 // Export the Supabase connection instance

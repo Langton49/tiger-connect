@@ -54,7 +54,7 @@ const App = () => (
                 <Route path="/cart" element={<Cart />} />
                 <Route path="/checkout" element={<Checkout />} />
                 <Route path="/order-success" element={<OrderSuccess />} />
-                <Route path="/messages/:recieverId" element={<MessagesPage />} />
+                <Route path="/messages/:receiverId" element={<MessagesPage />} />
                 <Route path="/messages" element={<MessagesInbox />} />
                 <Route path="*" element={<NotFound />} />
               </Routes>
