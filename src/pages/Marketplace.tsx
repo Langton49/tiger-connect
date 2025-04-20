@@ -368,7 +368,7 @@ export default function Marketplace() {
                     {filteredListings.length > 0 ? (
                         filteredListings.map((item) => (
                             <Link to={`/product/${item.id}`} key={item.id}>
-                                <Card className="hover:shadow-lg transition-shadow cursor-pointer">
+                                <Card className="hover:shadow-lg transition-shadow cursor-pointer bg-blue-500">
                                     <CardContent className="p-4">
                                         <div className="aspect-square relative mb-4">
                                             <img

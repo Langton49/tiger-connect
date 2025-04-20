@@ -24,3 +24,5 @@ dist-ssr
 *.sw?
 .priv
 .env.local
+# Google Cloud Vision service account key
+supabase/functions/verify-id/service-account.json
