@@ -28,7 +28,6 @@ import { categories } from "@/models/Marketplace";
 import { ImageUpload } from "@/components/image-upload";
 import { ArrowLeft } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
-import SellerOnboarding from "./Onboarding";
 
 const formSchema = z.object({
   title: z.string().min(5, {
@@ -53,7 +52,6 @@ export default function MarketplaceNew() {
   const navigate = useNavigate();
   const { currentUser, isAuthenticated } = useAuth();
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [canSell, setCanSell] = useState(false);
 
   // ✅ Always call hooks first
   const form = useForm<z.infer<typeof formSchema>>({
@@ -68,24 +66,13 @@ export default function MarketplaceNew() {
     },
   });
 
-  // useEffect(() => {
-  //   if (!isAuthenticated) {
-  //     navigate("/login", { replace: true });
-  //     return;
-  //   }
+  // ✅ Handle redirect as a side effect
+  useEffect(() => {
+    if (!isAuthenticated) {
+      navigate("/login", { replace: true });
+    }
+  }, [isAuthenticated, navigate]);
 
-  //   // const checkSeller = async () => {
-  //   //   try {
-  //   //     const res = await supabaseCon.checkSellerStatus(currentUser?.user_id);
-  //   //     setCanSell(res ?? false);
-  //   //   } catch (error) {
-  //   //     console.error("Error checking seller status:", error);
-  //   //     toast.error("Failed to verify seller status");
-  //   //   }
-  //   // };
-
-  //   checkSeller();
-  // }, [isAuthenticated, navigate, currentUser]);
   if (!isAuthenticated) return null;
 
   const onSubmit = async (values: z.infer<typeof formSchema>) => {
@@ -162,7 +149,7 @@ export default function MarketplaceNew() {
 
       // Navigate to marketplace after a slight delay to allow notifications to be created
       setTimeout(() => {
-        navigate("/marketplace");
+      navigate("/marketplace");
       }, 300);
     } catch (error) {
       console.error("Error submitting form:", error);
@@ -171,10 +158,6 @@ export default function MarketplaceNew() {
       setIsSubmitting(false);
     }
   };
-
-  // if (!canSell) {
-  //   return <SellerOnboarding />;
-  // }
 
   return (
     <AppLayout title="List Item for Sale">

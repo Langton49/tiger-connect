@@ -15,7 +15,7 @@ export default function MessagesInbox() {
   const [lastMessages, setLastMessages] = useState({});
   const [error, setError] = useState(null);
 
-  const fetchConversations = async () => {
+    const fetchConversations = async () => {
     if (!currentUser?.user_id) {
       console.log("No current user ID, not fetching conversations");
       setLoading(false);
@@ -37,7 +37,7 @@ export default function MessagesInbox() {
       if (res.success) {
         if (res.data && res.data.length > 0) {
           console.log("✅ Found conversations:", res.data.length);
-          setConversations(res.data);
+        setConversations(res.data);
           
           // Fetch last messages for each conversation
           const lastMsgs = {};
@@ -241,7 +241,7 @@ export default function MessagesInbox() {
     <AppLayout title="Messages">
       <div className="p-6 space-y-4">
         <div className="flex justify-between items-center">
-          <h1 className="text-2xl font-bold">Your Messages</h1>
+        <h1 className="text-2xl font-bold">Your Messages</h1>
           <Button 
             variant="ghost" 
             size="sm" 
@@ -281,9 +281,9 @@ export default function MessagesInbox() {
                   <CardContent className="p-4">
                     <div className="flex justify-between items-start">
                       <div>
-                        <h2 className="text-lg font-medium">
-                          {user.first_name} {user.last_name}
-                        </h2>
+                    <h2 className="text-lg font-medium">
+                      {user.first_name} {user.last_name}
+                    </h2>
                         {lastMessages[user.user_id] && (
                           <p className="text-sm text-gray-600 mt-1 line-clamp-1">
                             {lastMessages[user.user_id].isFromMe && <span className="text-xs font-medium text-gray-400 mr-1">You:</span>}

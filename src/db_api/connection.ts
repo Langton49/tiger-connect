@@ -32,7 +32,7 @@ class SupabaseDbConnection {
             if (error) throw new Error(error.message);
 
             if ((await this.userExists(gnumber)).exists) {
-                await this.supabase.auth.api.deleteUser(data.user.id);
+                await this.supabase.auth.admin.deleteUser(data.user.id);
                 throw new Error("User already exists");
             }
 
@@ -49,7 +49,7 @@ class SupabaseDbConnection {
                 ]);
 
             if (insertError) {
-                await this.supabase.auth.api.deleteUser(data.user.id);
+                await this.supabase.auth.admin.deleteUser(data.user.id);
                 throw new Error(insertError.message);
             }
 
@@ -816,6 +816,41 @@ class SupabaseDbConnection {
             providerMessage,
             bookingId
         );
+    }
+
+    // ---- New Methods for Admin Panel ----
+
+    // Get all unverified organizations (for system admin)
+    async getPendingOrganizations(): Promise<{ success: boolean; data?: any; error?: string }> {
+        // Implementation in JS file
+        return { success: false, error: "Not implemented" };
+    }
+
+    // Approve an organization (admin only)
+    async approveOrganization(
+        organizationId: string, 
+        userId: string
+    ): Promise<{ success: boolean; data?: any; error?: string }> {
+        // Implementation in JS file
+        return { success: false, error: "Not implemented" };
+    }
+
+    // Get pending members for organizations where a user is admin
+    async getPendingMembersForAdmin(
+        adminUserId: string
+    ): Promise<{ success: boolean; data?: { adminOrganizations: any[], pendingMembers: any[] }; error?: string }> {
+        // Implementation in JS file
+        return { success: false, error: "Not implemented" };
+    }
+
+    // Approve a member of an organization (organization admin only)
+    async approveOrganizationMember(
+        memberUserId: string,
+        organizationId: string,
+        approverUserId: string
+    ): Promise<{ success: boolean; data?: any; error?: string }> {
+        // Implementation in JS file
+        return { success: false, error: "Not implemented" };
     }
 }
 

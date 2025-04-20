@@ -80,8 +80,7 @@ export default function Checkout() {
                             items: JSON.stringify(
                                 items.map((item) => ({
                                     id: item.item.id,
-                                    seller_stripe_id:
-                                        item.item.seller_stripe_id,
+                                    seller_stripe_id: item.item.seller_stripe_id,
                                     quantity: item.quantity,
                                     totalPrice: item.item.price * item.quantity,
                                 }))
@@ -97,25 +96,22 @@ export default function Checkout() {
             }
 
             const { error: confirmError, paymentIntent } =
-                await stripe.confirmCardPayment(
-                    paymentIntentData.clientSecret,
-                    {
-                        payment_method: {
-                            card: elements.getElement(CardElement)!,
-                            billing_details: {
-                                name: formData.cardName,
-                                email: formData.email,
-                                address: {
-                                    line1: formData.address,
-                                    city: formData.city,
-                                    state: formData.state,
-                                    postal_code: formData.zipCode,
-                                    country: "US",
-                                },
+                await stripe.confirmCardPayment(paymentIntentData.clientSecret, {
+                    payment_method: {
+                        card: elements.getElement(CardElement)!,
+                        billing_details: {
+                            name: formData.cardName,
+                            email: formData.email,
+                            address: {
+                                line1: formData.address,
+                                city: formData.city,
+                                state: formData.state,
+                                postal_code: formData.zipCode,
+                                country: "US",
                             },
                         },
-                    }
-                );
+                    },
+                });
 
             if (confirmError) {
                 throw new Error(confirmError.message);
@@ -125,20 +121,18 @@ export default function Checkout() {
                 const { data: userData } = await supabase.auth.getUser();
                 const customerId = userData.user?.id || null;
 
-                const { error: orderError } = await supabase
-                    .from("orders")
-                    .insert({
-                        payment_intent_id: paymentIntent.id,
-                        amount: totalPrice,
-                        status: "processing",
-                        user_id: customerId,
-                        items: items.map((item) => ({
-                            product_id: item.item.id,
-                            seller_id: item.item.seller_id,
-                            quantity: item.quantity,
-                            price: item.item.price,
-                        })),
-                    });
+                const { error: orderError } = await supabase.from("orders").insert({
+                    payment_intent_id: paymentIntent.id,
+                    amount: totalPrice,
+                    status: "processing",
+                    user_id: customerId,
+                    items: items.map((item) => ({
+                        product_id: item.item.id,
+                        seller_id: item.item.seller_id,
+                        quantity: item.quantity,
+                        price: item.item.price,
+                    })),
+                });
 
                 if (orderError) {
                     console.error("Order creation error:", orderError);
@@ -168,9 +162,7 @@ export default function Checkout() {
             toast({
                 title: "Payment failed",
                 description:
-                    error instanceof Error
-                        ? error.message
-                        : "An unknown error occurred",
+                    error instanceof Error ? error.message : "An unknown error occurred",
                 variant: "destructive",
             });
         } finally {
@@ -299,6 +291,18 @@ export default function Checkout() {
                                         Payment Information
                                     </h2>
 
+                                    {/* Name on Card Input */}
+                                    <div className="space-y-2">
+                                        <Label htmlFor="cardName">Name on Card</Label>
+                                        <Input
+                                            id="cardName"
+                                            value={formData.cardName}
+                                            onChange={(e) => handleInputChange(e, "cardName")}
+                                            required
+                                        />
+                                    </div>
+
+                                    {/* Card Element Input */}
                                     <div className="space-y-2">
                                         <Label>Card Details</Label>
                                         <div className="border rounded-md p-2">
@@ -321,23 +325,10 @@ export default function Checkout() {
                                         </div>
                                     </div>
 
-                                    <div className="space-y-2">
-                                        <Label htmlFor="cardName">
-                                            Name on Card
-                                        </Label>
-                                        <Input
-                                            id="cardName"
-                                            value={formData.cardName}
-                                            onChange={(e) =>
-                                                handleInputChange(e, "cardName")
-                                            }
-                                            required
-                                        />
-                                    </div>
-
+                                    {/* Submit Button */}
                                     <Button
                                         type="submit"
-                                        className="w-full bg-grambling-gold hover:bg-grambling-gold/90 text-grambling-black"
+                                        className="w-full bg-grambling-gold hover:bg-grambling-gold/90 text-grambling-black mt-6"
                                         disabled={!stripe || isProcessing}
                                     >
                                         {isProcessing
@@ -408,3 +399,4 @@ export default function Checkout() {
         </AppLayout>
     );
 }
+

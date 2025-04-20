@@ -21,6 +21,7 @@ interface AuthContextType {
   ) => Promise<boolean>;
   logout: () => void;
   verifyAccount: () => Promise<boolean>;
+  makeUserAdmin: (engineeringCode: string) => Promise<boolean>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -198,21 +199,66 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const logout = async () => {
     const logoutResult = await supabaseCon.logout();
-    if (!logoutResult.success) {
-      toast({
-        title: "Logout Error",
-        description: "An unexpected error occurred. Please try again.",
-        variant: "destructive",
-      });
-      return;
-    }
+    
+    // Even if logout fails server-side, we'll clear locally for better UX
     setCurrentUser(null);
     setIsAuthenticated(false);
     localStorage.removeItem("tigerUser");
-    toast({
-      title: "Logged Out",
-      description: "You have been successfully logged out.",
-    });
+  };
+
+  const makeUserAdmin = async (engineeringCode: string): Promise<boolean> => {
+    try {
+      if (!currentUser?.user_id) {
+        toast({
+          title: "Error",
+          description: "You must be logged in to become an admin",
+          variant: "destructive",
+        });
+        return false;
+      }
+
+      // Validate the engineering team code
+      // In a real app, this would be more secure, but for this example we use a simple code
+      if (engineeringCode !== "TigerConnect2024") {
+        toast({
+          title: "Invalid Code",
+          description: "The engineering team code is incorrect",
+          variant: "destructive",
+        });
+        return false;
+      }
+
+      // Make the user an admin in the database
+      const result = await supabaseCon.makeUserAdmin(currentUser.user_id);
+
+      if (result.success) {
+        // Update the local user state
+        const updatedUser = { ...currentUser, is_admin: true };
+        setCurrentUser(updatedUser);
+        localStorage.setItem("tigerUser", JSON.stringify(updatedUser));
+
+        toast({
+          title: "Admin Access Granted",
+          description: "You now have administrator privileges",
+        });
+        return true;
+      } else {
+        toast({
+          title: "Error",
+          description: result.error || "Failed to grant admin access",
+          variant: "destructive",
+        });
+        return false;
+      }
+    } catch (error) {
+      console.error("Error making user admin:", error);
+      toast({
+        title: "Error",
+        description: "An unexpected error occurred",
+        variant: "destructive",
+      });
+      return false;
+    }
   };
 
   return (
@@ -224,6 +270,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         register,
         logout,
         verifyAccount,
+        makeUserAdmin,
       }}
     >
       {children}

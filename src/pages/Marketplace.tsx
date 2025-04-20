@@ -35,12 +35,8 @@ export default function Marketplace() {
     const [priceRange, setPriceRange] = useState<[number, number]>([0, 1000]);
     const [condition, setCondition] = useState<string>("");
     const [sortBy, setSortBy] = useState<string>("newest");
-    const [originalListings, setOriginalListings] = useState<MarketplaceItem[]>(
-        []
-    );
-    const [filteredListings, setFilteredListings] = useState<MarketplaceItem[]>(
-        []
-    );
+    const [originalListings, setOriginalListings] = useState<MarketplaceItem[]>([]);
+    const [filteredListings, setFilteredListings] = useState<MarketplaceItem[]>([]);
     const [users, setOtherUsers] = useState<User[]>([]);
 
     useEffect(() => {
@@ -72,9 +68,7 @@ export default function Marketplace() {
         }
 
         if (selectedCategory) {
-            filtered = filtered.filter(
-                (item) => item.category === selectedCategory
-            );
+            filtered = filtered.filter((item) => item.category === selectedCategory);
         }
 
         filtered = filtered.filter(
@@ -88,14 +82,12 @@ export default function Marketplace() {
         if (sortBy === "newest") {
             filtered.sort(
                 (a, b) =>
-                    new Date(b.created_at).getTime() -
-                    new Date(a.created_at).getTime()
+                    new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
             );
         } else if (sortBy === "oldest") {
             filtered.sort(
                 (a, b) =>
-                    new Date(a.created_at).getTime() -
-                    new Date(b.created_at).getTime()
+                    new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
             );
         } else if (sortBy === "price_low") {
             filtered.sort((a, b) => a.price - b.price);
@@ -151,16 +143,13 @@ export default function Marketplace() {
                             <SheetHeader>
                                 <SheetTitle>Filter Items</SheetTitle>
                                 <SheetDescription>
-                                    Filter marketplace items by category, price,
-                                    and condition
+                                    Filter marketplace items by category, price, and condition
                                 </SheetDescription>
                             </SheetHeader>
                             {/* Filter content would go here */}
                             <SheetFooter className="mt-4">
                                 <SheetClose asChild>
-                                    <Button onClick={resetFilters}>
-                                        Reset Filters
-                                    </Button>
+                                    <Button onClick={resetFilters}>Reset Filters</Button>
                                 </SheetClose>
                             </SheetFooter>
                         </SheetContent>
@@ -178,10 +167,7 @@ export default function Marketplace() {
                 <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
                     {filteredListings.length > 0 ? (
                         filteredListings.map((item) => (
-                            <Card
-                                key={item.id}
-                                className="hover:shadow-lg transition-shadow cursor-pointer"
-                            >
+                            <Card key={item.id} className="hover:shadow-lg transition-shadow cursor-pointer">
                                 <CardContent className="p-4">
                                     <Link to={`/product/${item.id}`}>
                                         <div className="aspect-square relative mb-4">
@@ -199,17 +185,13 @@ export default function Marketplace() {
                                         </p>
                                     </Link>
                                     <div className="flex justify-between items-center">
-                                        <p className="font-bold text-lg">
-                                            ${item.price}
-                                        </p>
+                                        <p className="font-bold text-lg">${item.price}</p>
                                         <p className="text-sm text-gray-500">
                                             {getSellerName(item.seller_id)}
                                         </p>
                                     </div>
                                     <div className="mt-2 text-right">
-                                        <Link
-                                            to={`/messages/${item.seller_id}`}
-                                        >
+                                        <Link to={`/messages/${item.seller_id}`}>
                                             <MessageCircle className="w-5 h-5 text-grambling-gold hover:text-grambling-gold/80" />
                                         </Link>
                                     </div>

@@ -6,7 +6,6 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { CartProvider } from "@/contexts/CartContext";
 import { Elements } from "@stripe/react-stripe-js";
-import SellerOnboarding from "./pages/Onboarding";
 
 // Pages
 import Home from "./pages/Home";
@@ -16,6 +15,8 @@ import Services from "./pages/Services";
 import ServicesNew from "./pages/ServicesNew";
 import ServiceDetail from "./pages/ServiceDetail";
 import Events from "./pages/Events";
+import EventNew from "./pages/EventNew";
+import EventDetail from "./pages/EventDetail";
 import Profile from "./pages/Profile";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
@@ -51,6 +52,8 @@ const App = () => (
                 <Route path="/services/new" element={<ServicesNew />} />
                 <Route path="/services/:id" element={<ServiceDetail />} />
                 <Route path="/events" element={<Events />} />
+                <Route path="/events/new" element={<EventNew />} />
+                <Route path="/events/:id" element={<EventDetail />} />
                 <Route path="/profile" element={<Profile />} />
                 <Route path="/search" element={<Search />} />
                 <Route path="/login" element={<Login />} />
@@ -64,10 +67,6 @@ const App = () => (
                 <Route path="/messages" element={<MessagesInbox />} />
                 <Route path="/notifications" element={<Notifications />} />
                 <Route path="*" element={<NotFound />} />
-                <Route
-                  path="/onboarding"
-                  element={<SellerOnboarding />}
-                ></Route>
               </Routes>
             </BrowserRouter>
           </CartProvider>

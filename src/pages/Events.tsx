@@ -4,16 +4,25 @@ import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import {
     Filter,
     Search,
     CalendarDays,
     Clock,
     MapPin,
-    Users,
+    Plus,
+    Calendar,
+    BadgeAlert,
+    Building,
+    User,
 } from "lucide-react";
-import { mockEvents, eventCategories, Event } from "@/models/Event";
+import { 
+    Event, 
+    eventCategories, 
+    organizationPriority, 
+    organizationTypeNames 
+} from "@/models/Event";
 import {
     Select,
     SelectContent,
@@ -31,33 +40,33 @@ import {
     SheetTitle,
     SheetTrigger,
 } from "@/components/ui/sheet";
+import { Badge } from "@/components/ui/badge";
+import { supabaseCon } from "@/db_api/connection";
+import { toast } from "sonner";
 
 export default function Events() {
-    const { isAuthenticated } = useAuth();
+    const { currentUser } = useAuth();
+    const navigate = useNavigate();
     const [searchQuery, setSearchQuery] = useState("");
     const [selectedCategory, setSelectedCategory] = useState<string>("");
+    const [organizationType, setOrganizationType] = useState<string>("all");
     const [dateFilter, setDateFilter] = useState<string>("all");
-    const [showStudentOnly, setShowStudentOnly] = useState<boolean>(false);
-    const [sortBy, setSortBy] = useState<string>("upcoming");
-    const [filteredEvents, setFilteredEvents] = useState<Event[]>(mockEvents);
+    const [sortBy, setSortBy] = useState<string>("date");
+    
+    const [events, setEvents] = useState<Event[]>([]);
+    const [filteredEvents, setFilteredEvents] = useState<Event[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [userCanCreateEvents, setUserCanCreateEvents] = useState(false);
+    const [userOrganizations, setUserOrganizations] = useState([]);
 
     // Format date for display
-    const formatEventDate = (startDate: Date, endDate: Date) => {
-        if (startDate.toDateString() === endDate.toDateString()) {
-            return new Date(startDate).toLocaleDateString("en-US", {
-                weekday: "short",
-                month: "short",
-                day: "numeric",
-            });
-        } else {
-            return `${new Date(startDate).toLocaleDateString("en-US", {
-                month: "short",
-                day: "numeric",
-            })} - ${new Date(endDate).toLocaleDateString("en-US", {
-                month: "short",
-                day: "numeric",
-            })}`;
-        }
+    const formatEventDate = (date: Date) => {
+        return new Date(date).toLocaleDateString("en-US", {
+            weekday: "short",
+            month: "short",
+            day: "numeric",
+            year: "numeric"
+        });
     };
 
     // Format time for display
@@ -68,8 +77,81 @@ export default function Events() {
         });
     };
 
+    // Get the organization type badge
+    const getOrgTypeBadge = (type: string) => {
+        switch(type) {
+            case 'admin_faculty':
+                return <Badge variant="destructive" className="text-xs">Faculty/Admin</Badge>;
+            case 'official_student':
+                return <Badge variant="default" className="bg-grambling-gold text-black text-xs">Official</Badge>;
+            case 'general':
+                return <Badge variant="outline" className="text-xs">Club</Badge>;
+            default:
+                return null;
+        }
+    };
+
+    // Fetch events and user permissions
     useEffect(() => {
-        let filtered = [...mockEvents];
+        const fetchData = async () => {
+            setLoading(true);
+            try {
+                // Fetch all events
+                const eventsData = await supabaseCon.getEvents();
+                
+                if (eventsData.success && eventsData.data) {
+                    // Convert string dates to Date objects
+                    const formattedEvents = eventsData.data.map(event => ({
+                        ...event,
+                        date: new Date(event.date),
+                        created_at: new Date(event.created_at)
+                    }));
+                    
+                    // Sort events by date and organization priority
+                    const sortedEvents = formattedEvents.sort((a, b) => {
+                        // First by date
+                        const dateComp = a.date.getTime() - b.date.getTime();
+                        if (dateComp !== 0) return dateComp;
+                        
+                        // Then by organization type priority
+                        return (
+                            organizationPriority[a.organization.type] - 
+                            organizationPriority[b.organization.type]
+                        );
+                    });
+                    
+                    setEvents(sortedEvents);
+                    setFilteredEvents(sortedEvents);
+                } else {
+                    console.error("Failed to fetch events:", eventsData.error);
+                    toast.error("Failed to load events");
+                }
+                
+                // Check if user can create events
+                if (currentUser?.user_id) {
+                    const userPermissions = await supabaseCon.canUserCreateEvents(currentUser.user_id);
+                    
+                    if (userPermissions.success) {
+                        setUserCanCreateEvents(userPermissions.canCreate);
+                        setUserOrganizations(userPermissions.organizations || []);
+                    }
+                }
+            } catch (error) {
+                console.error("Error fetching data:", error);
+                toast.error("An error occurred while loading events");
+            } finally {
+                setLoading(false);
+            }
+        };
+        
+        fetchData();
+    }, [currentUser]);
+
+    // Filter events when filter criteria change
+    useEffect(() => {
+        if (!events.length) return;
+        
+        let filtered = [...events];
 
         // Apply search query filter
         if (searchQuery) {
@@ -78,14 +160,15 @@ export default function Events() {
                 (event) =>
                     event.title.toLowerCase().includes(query) ||
                     event.description.toLowerCase().includes(query) ||
-                    event.location.toLowerCase().includes(query)
+                    event.location.toLowerCase().includes(query) ||
+                    event.organization.name.toLowerCase().includes(query)
             );
         }
 
-        // Apply category filter
-        if (selectedCategory) {
+        // Apply organization type filter
+        if (organizationType !== "all") {
             filtered = filtered.filter(
-                (event) => event.category === selectedCategory
+                (event) => event.organization.type === organizationType
             );
         }
 
@@ -93,53 +176,69 @@ export default function Events() {
         const now = new Date();
         if (dateFilter === "today") {
             filtered = filtered.filter(
-                (event) =>
-                    event.startDate.toDateString() === now.toDateString() ||
-                    (event.startDate <= now && event.endDate >= now)
+                (event) => event.date.toDateString() === now.toDateString()
             );
-        } else if (dateFilter === "this_week") {
-            const weekFromNow = new Date(now);
-            weekFromNow.setDate(weekFromNow.getDate() + 7);
+        } else if (dateFilter === "upcoming") {
             filtered = filtered.filter(
-                (event) =>
-                    event.startDate >= now && event.startDate <= weekFromNow
+                (event) => event.date >= now
             );
-        } else if (dateFilter === "this_month") {
-            const monthFromNow = new Date(now);
-            monthFromNow.setMonth(monthFromNow.getMonth() + 1);
+        } else if (dateFilter === "past") {
             filtered = filtered.filter(
-                (event) =>
-                    event.startDate >= now && event.startDate <= monthFromNow
+                (event) => event.date < now
             );
-        }
-
-        // Apply student only filter
-        if (showStudentOnly) {
-            filtered = filtered.filter((event) => event.studentOnly);
         }
 
         // Apply sorting
-        if (sortBy === "upcoming") {
-            filtered.sort(
-                (a, b) => a.startDate.getTime() - b.startDate.getTime()
-            );
-        } else if (sortBy === "popularity") {
-            filtered.sort((a, b) => b.attendeeCount - a.attendeeCount);
+        if (sortBy === "date") {
+            filtered.sort((a, b) => a.date.getTime() - b.date.getTime());
+        } else if (sortBy === "priority") {
+            filtered.sort((a, b) => {
+                return (
+                    organizationPriority[a.organization.type] - 
+                    organizationPriority[b.organization.type]
+                );
+            });
         }
 
         setFilteredEvents(filtered);
-    }, [searchQuery, selectedCategory, dateFilter, showStudentOnly, sortBy]);
+    }, [events, searchQuery, organizationType, dateFilter, sortBy]);
 
     const resetFilters = () => {
         setSelectedCategory("");
+        setOrganizationType("all");
         setDateFilter("all");
-        setShowStudentOnly(false);
+    };
+
+    const handleCreateEvent = () => {
+        if (!currentUser) {
+            toast.error("Please log in to create events");
+            navigate("/login");
+            return;
+        }
+        
+        if (!userCanCreateEvents) {
+            toast.error("You must be a verified member of an organization to create events");
+            return;
+        }
+        
+        navigate("/events/new");
     };
 
     return (
         <AppLayout title="Events">
             <div className="space-y-4">
-                {/* Search and Sort Bar */}
+                {/* Header with Create Button */}
+                <div className="flex justify-between items-center">
+                    <h1 className="text-2xl font-bold">Campus Events</h1>
+                    {userCanCreateEvents && (
+                        <Button onClick={handleCreateEvent} className="flex items-center gap-2">
+                            <Plus className="h-4 w-4" />
+                            Create Event
+                        </Button>
+                    )}
+                </div>
+                
+                {/* Search and Filter Bar */}
                 <div className="flex items-center space-x-2">
                     <div className="relative flex-grow">
                         <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
@@ -167,27 +266,28 @@ export default function Events() {
                             <div className="py-4 space-y-4">
                                 <div className="space-y-2">
                                     <label className="text-sm font-medium">
-                                        Category
+                                        Organization Type
                                     </label>
                                     <Select
-                                        value={selectedCategory}
-                                        onValueChange={setSelectedCategory}
+                                        value={organizationType}
+                                        onValueChange={setOrganizationType}
                                     >
                                         <SelectTrigger>
-                                            <SelectValue placeholder="All Categories" />
+                                            <SelectValue placeholder="All Organizations" />
                                         </SelectTrigger>
                                         <SelectContent>
-                                            <SelectItem value="">
-                                                All Categories
+                                            <SelectItem value="all">
+                                                All Organizations
                                             </SelectItem>
-                                            {eventCategories.map((category) => (
-                                                <SelectItem
-                                                    key={category}
-                                                    value={category}
-                                                >
-                                                    {category}
-                                                </SelectItem>
-                                            ))}
+                                            <SelectItem value="admin_faculty">
+                                                Faculty/Admin
+                                            </SelectItem>
+                                            <SelectItem value="official_student">
+                                                Official Student Orgs
+                                            </SelectItem>
+                                            <SelectItem value="general">
+                                                Clubs & Groups
+                                            </SelectItem>
                                         </SelectContent>
                                     </Select>
                                 </div>
@@ -210,32 +310,14 @@ export default function Events() {
                                             <SelectItem value="today">
                                                 Today
                                             </SelectItem>
-                                            <SelectItem value="this_week">
-                                                This Week
+                                            <SelectItem value="upcoming">
+                                                Upcoming
                                             </SelectItem>
-                                            <SelectItem value="this_month">
-                                                This Month
+                                            <SelectItem value="past">
+                                                Past Events
                                             </SelectItem>
                                         </SelectContent>
                                     </Select>
-                                </div>
-
-                                <div className="flex items-center space-x-2">
-                                    <input
-                                        type="checkbox"
-                                        id="student-only"
-                                        checked={showStudentOnly}
-                                        onChange={(e) =>
-                                            setShowStudentOnly(e.target.checked)
-                                        }
-                                        className="rounded border-grambling-gold text-grambling-gold focus:ring-grambling-gold"
-                                    />
-                                    <label
-                                        htmlFor="student-only"
-                                        className="text-sm font-medium"
-                                    >
-                                        Student-Only Events
-                                    </label>
                                 </div>
 
                                 <div className="space-y-2">
@@ -247,30 +329,30 @@ export default function Events() {
                                         onValueChange={setSortBy}
                                     >
                                         <SelectTrigger>
-                                            <SelectValue placeholder="Upcoming" />
+                                            <SelectValue placeholder="Date" />
                                         </SelectTrigger>
                                         <SelectContent>
-                                            <SelectItem value="upcoming">
-                                                Upcoming
+                                            <SelectItem value="date">
+                                                Date
                                             </SelectItem>
-                                            <SelectItem value="popularity">
-                                                Most Popular
+                                            <SelectItem value="priority">
+                                                Priority
                                             </SelectItem>
                                         </SelectContent>
                                     </Select>
                                 </div>
                             </div>
-                            <SheetFooter className="flex-row justify-between sm:justify-between space-x-2">
-                                <Button
-                                    variant="outline"
-                                    onClick={resetFilters}
-                                >
-                                    Reset Filters
-                                </Button>
+                            <SheetFooter>
                                 <SheetClose asChild>
-                                    <Button className="bg-grambling-gold hover:bg-grambling-gold/90 text-grambling-black">
-                                        Apply Filters
+                                    <Button
+                                        variant="outline"
+                                        onClick={resetFilters}
+                                    >
+                                        Reset Filters
                                     </Button>
+                                </SheetClose>
+                                <SheetClose asChild>
+                                    <Button>Apply Filters</Button>
                                 </SheetClose>
                             </SheetFooter>
                         </SheetContent>
@@ -278,15 +360,13 @@ export default function Events() {
                 </div>
 
                 {/* Active Filters Display */}
-                {(selectedCategory ||
-                    dateFilter !== "all" ||
-                    showStudentOnly) && (
+                {(organizationType !== "all" || dateFilter !== "all") && (
                     <div className="flex flex-wrap gap-2">
-                        {selectedCategory && (
+                        {organizationType !== "all" && (
                             <div className="bg-grambling-gold/20 text-grambling-black text-xs py-1 px-2 rounded-full flex items-center">
-                                {selectedCategory}
+                                {organizationTypeNames[organizationType]}
                                 <button
-                                    onClick={() => setSelectedCategory("")}
+                                    onClick={() => setOrganizationType("all")}
                                     className="ml-1 text-xs"
                                 >
                                     ×
@@ -298,23 +378,11 @@ export default function Events() {
                             <div className="bg-grambling-gold/20 text-grambling-black text-xs py-1 px-2 rounded-full flex items-center">
                                 {dateFilter === "today"
                                     ? "Today"
-                                    : dateFilter === "this_week"
-                                    ? "This Week"
-                                    : "This Month"}
+                                    : dateFilter === "upcoming"
+                                    ? "Upcoming"
+                                    : "Past Events"}
                                 <button
                                     onClick={() => setDateFilter("all")}
-                                    className="ml-1 text-xs"
-                                >
-                                    ×
-                                </button>
-                            </div>
-                        )}
-
-                        {showStudentOnly && (
-                            <div className="bg-grambling-gold/20 text-grambling-black text-xs py-1 px-2 rounded-full flex items-center">
-                                Student Only
-                                <button
-                                    onClick={() => setShowStudentOnly(false)}
                                     className="ml-1 text-xs"
                                 >
                                     ×
@@ -331,80 +399,70 @@ export default function Events() {
                     </div>
                 )}
 
-                {/* Events */}
-                <div className="space-y-4 mb-8">
-                    {filteredEvents.length > 0 ? (
+                {/* Events Grid */}
+                <div className="grid md:grid-cols-2 gap-4">
+                    {loading ? (
+                        <div className="col-span-2 py-8 text-center">
+                            <div className="animate-spin h-8 w-8 border-4 border-grambling-gold border-t-transparent rounded-full mx-auto"></div>
+                            <p className="mt-4 text-gray-500">Loading events...</p>
+                        </div>
+                    ) : filteredEvents.length > 0 ? (
                         filteredEvents.map((event) => (
                             <Link to={`/events/${event.id}`} key={event.id}>
-                                <Card className="tiger-card mb-8">
+                                <Card className="h-full hover:shadow-md transition-shadow">
                                     <CardContent className="p-0">
-                                        <div className="md:flex">
-                                            <div className="md:w-1/3">
-                                                <img
-                                                    src={
-                                                        event.image ||
-                                                        "https://www.google.com/url?sa=i&url=https%3A%2F%2Fclutchpoints.com%2Falabama-am-spoils-grambling-states-homecoming-celebration-45-24&psig=AOvVaw0LOMn7Ky0oNktCaU-Fu382&ust=1743660041282000&source=images&cd=vfe&opi=89978449&ved=0CBQQjRxqFwoTCKi2t9XWuIwDFQAAAAAdAAAAABAE"
-                                                    }
-                                                    alt={event.title}
-                                                    className="w-full h-48 md:h-full object-cover rounded-t-lg md:rounded-tr-none md:rounded-l-lg"
-                                                />
-                                            </div>
+                                        <div className="flex flex-col md:flex-row h-full">
+                                            {event.image_url ? (
+                                                <div className="md:w-1/3 h-48 md:h-auto">
+                                                    <img
+                                                        src={event.image_url}
+                                                        alt={event.title}
+                                                        className="w-full h-full object-cover"
+                                                    />
+                                                </div>
+                                            ) : (
+                                                <div className="md:w-1/3 h-48 md:h-auto bg-gray-200 flex items-center justify-center">
+                                                    <Calendar className="h-12 w-12 text-gray-400" />
+                                                </div>
+                                            )}
+
                                             <div className="p-4 md:w-2/3">
                                                 <div className="flex justify-between items-start">
                                                     <h3 className="font-semibold text-lg">
                                                         {event.title}
                                                     </h3>
-                                                    {event.studentOnly && (
-                                                        <span className="bg-grambling-black text-white text-xs px-2 py-1 rounded">
-                                                            Students Only
-                                                        </span>
-                                                    )}
+                                                    {getOrgTypeBadge(event.organization.type)}
                                                 </div>
 
                                                 <p className="text-sm text-gray-500 line-clamp-2 mt-1">
                                                     {event.description}
                                                 </p>
 
-                                                <div className="mt-3 space-y-1">
-                                                    <div className="flex items-center text-sm">
+                                                <div className="mt-4 space-y-2 text-sm text-gray-600">
+                                                    <div className="flex items-center">
                                                         <CalendarDays className="h-4 w-4 mr-2 text-grambling-gold" />
-                                                        {formatEventDate(
-                                                            event.startDate,
-                                                            event.endDate
-                                                        )}
+                                                        {formatEventDate(event.date)}
                                                     </div>
 
-                                                    <div className="flex items-center text-sm">
+                                                    <div className="flex items-center">
                                                         <Clock className="h-4 w-4 mr-2 text-grambling-gold" />
-                                                        {formatEventTime(
-                                                            event.startDate
-                                                        )}
-                                                        {event.startDate.toDateString() !==
-                                                            event.endDate.toDateString() &&
-                                                            ` - ${formatEventTime(
-                                                                event.endDate
-                                                            )}`}
+                                                        {formatEventTime(event.date)}
                                                     </div>
 
-                                                    <div className="flex items-center text-sm">
+                                                    <div className="flex items-center">
                                                         <MapPin className="h-4 w-4 mr-2 text-grambling-gold" />
                                                         {event.location}
                                                     </div>
 
-                                                    <div className="flex items-center text-sm">
-                                                        <Users className="h-4 w-4 mr-2 text-grambling-gold" />
-                                                        {event.attendeeCount}{" "}
-                                                        attending
+                                                    <div className="flex items-center">
+                                                        <Building className="h-4 w-4 mr-2 text-grambling-gold" />
+                                                        {event.organization.name}
                                                     </div>
                                                 </div>
 
                                                 <div className="mt-3 flex">
-                                                    <span className="bg-grambling-gold/20 text-grambling-black text-xs px-2 py-1 rounded-full">
-                                                        {event.category}
-                                                    </span>
-                                                    <span className="ml-2 text-xs text-gray-500 flex items-center">
-                                                        Organized by{" "}
-                                                        {event.organizer}
+                                                    <span className="text-xs text-gray-500 flex items-center">
+                                                        Created by {event.creator.first_name} {event.creator.last_name}
                                                     </span>
                                                 </div>
                                             </div>
@@ -414,17 +472,14 @@ export default function Events() {
                             </Link>
                         ))
                     ) : (
-                        <div className="text-center py-10">
-                            <p className="text-gray-500">
-                                No events match your search criteria
-                            </p>
-                            <Button
-                                variant="link"
+                        <div className="col-span-2 py-8 text-center">
+                            <p className="text-gray-500">No events match your search criteria</p>
+                            <button
                                 onClick={resetFilters}
-                                className="text-grambling-gold mt-2"
+                                className="mt-2 text-grambling-gold hover:underline"
                             >
                                 Clear all filters
-                            </Button>
+                            </button>
                         </div>
                     )}
                 </div>

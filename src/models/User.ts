@@ -11,6 +11,7 @@ export interface User {
   rating: number;
   joinedAt: Date;
   bio?: string;
+  is_admin?: boolean;
 }
 
 export const setUsers = async (): Promise<User[]> => {

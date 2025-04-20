@@ -14,17 +14,66 @@ import {
   VerifiedIcon,
   User,
   Clock,
+  Users,
+  Plus,
+  Building,
+  InfoIcon
 } from "lucide-react";
 import { setListings, MarketplaceItem } from "@/models/Marketplace";
 import { Service, setServiceListings } from "@/models/Service";
 import { useEffect, useState } from "react";
+import { supabaseCon } from "@/db_api/connection";
+import { 
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
+import { 
+  Form,
+  FormControl,
+  FormDescription,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
+import { z } from "zod";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { Textarea } from "@/components/ui/textarea";
+import { toast } from "sonner";
+import { organizationTypeNames } from "@/models/Event";
+import {
+  Tabs,
+  TabsList,
+  TabsContent,
+  TabsTrigger,
+} from "@/components/ui/tabs";
+import { AdminPendingOrganizations, AdminPendingMembers } from "@/components/admin-pending-organizations";
+import { Label } from "@/components/ui/label";
 
 export default function Profile() {
-  const { currentUser, isAuthenticated, logout } = useAuth();
-  const [marketListings, setNewMarketListings] = useState<MarketplaceItem[]>(
-    []
-  );
+  const { currentUser, isAuthenticated, logout, makeUserAdmin } = useAuth();
+  const [marketListings, setNewMarketListings] = useState<MarketplaceItem[]>([]);
   const [serviceListings, setNewServiceListings] = useState<Service[]>([]);
+  const [userOrganizations, setUserOrganizations] = useState([]);
+  const [allOrganizations, setAllOrganizations] = useState([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [createOrgOpen, setCreateOrgOpen] = useState(false);
+  const [joinOrgOpen, setJoinOrgOpen] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -37,6 +86,32 @@ export default function Profile() {
 
     fetchListings();
   }, []);
+
+  useEffect(() => {
+    const fetchOrganizations = async () => {
+      if (currentUser?.user_id) {
+        // Fetch user's organizations
+        const userOrgsResult = await supabaseCon.getUserOrganizations(currentUser.user_id);
+        if (userOrgsResult.success) {
+          setUserOrganizations(userOrgsResult.data || []);
+          console.log('User organizations:', userOrgsResult.data);
+        } else {
+          console.error('Failed to fetch user organizations:', userOrgsResult.error);
+        }
+        
+        // Fetch all organizations
+        const allOrgsResult = await supabaseCon.getOrganizations();
+        if (allOrgsResult.success) {
+          setAllOrganizations(allOrgsResult.data || []);
+          console.log('All organizations:', allOrgsResult.data);
+        } else {
+          console.error('Failed to fetch all organizations:', allOrgsResult.error);
+        }
+      }
+    };
+    
+    fetchOrganizations();
+  }, [currentUser]);
 
   // Redirect to login if not authenticated
   if (!isAuthenticated) {
@@ -71,6 +146,129 @@ export default function Profile() {
     } else {
       const diffMonths = Math.floor(diffDays / 30);
       return `${diffMonths} ${diffMonths === 1 ? "month" : "months"}`;
+    }
+  };
+
+  // Form schema for creating a new organization
+  const createOrgSchema = z.object({
+    name: z.string().min(3, "Organization name must be at least 3 characters"),
+    type: z.enum(['admin_faculty', 'official_student', 'general'], {
+      required_error: "Please select an organization type"
+    }),
+    description: z.string().min(10, "Description must be at least 10 characters"),
+  });
+
+  // Define the form for creating a new organization
+  const createOrgForm = useForm<z.infer<typeof createOrgSchema>>({
+    resolver: zodResolver(createOrgSchema),
+    defaultValues: {
+      name: "",
+      description: "",
+    },
+  });
+
+  // Handle form submission for creating a new organization
+  const onCreateOrgSubmit = async (values: z.infer<typeof createOrgSchema>) => {
+    setIsLoading(true);
+    
+    try {
+      const result = await supabaseCon.createOrganization(
+        values.name,
+        values.type,
+        values.description,
+        currentUser.user_id
+      );
+      
+      if (result.success) {
+        toast.success("Organization created successfully");
+        
+        // Refresh user's organizations
+        const userOrgsResult = await supabaseCon.getUserOrganizations(currentUser.user_id);
+        if (userOrgsResult.success) {
+          setUserOrganizations(userOrgsResult.data || []);
+        }
+        
+        setCreateOrgOpen(false);
+        createOrgForm.reset();
+      } else {
+        toast.error("Failed to create organization: " + result.error);
+      }
+    } catch (error) {
+      console.error("Error creating organization:", error);
+      toast.error("Failed to create organization");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Form schema for joining an existing organization
+  const joinOrgSchema = z.object({
+    organization_id: z.string({
+      required_error: "Please select an organization"
+    }),
+  });
+
+  // Define the form for joining an organization
+  const joinOrgForm = useForm<z.infer<typeof joinOrgSchema>>({
+    resolver: zodResolver(joinOrgSchema),
+  });
+
+  // Handle form submission for joining an organization
+  const onJoinOrgSubmit = async (values: z.infer<typeof joinOrgSchema>) => {
+    setIsLoading(true);
+    
+    try {
+      // Check if user is already a member of this organization
+      const isMember = userOrganizations.some(org => 
+        org.organization_id === values.organization_id
+      );
+      
+      if (isMember) {
+        toast.error("You are already a member of this organization");
+        setJoinOrgOpen(false);
+        return;
+      }
+      
+      // Add user as a member (this would need to be implemented in your connection.js)
+      // For now, let's assume this function exists
+      const result = await supabaseCon.joinOrganization(
+        currentUser.user_id,
+        values.organization_id
+      );
+      
+      if (result.success) {
+        toast.success("Request to join organization sent successfully");
+        
+        // Refresh user's organizations
+        const userOrgsResult = await supabaseCon.getUserOrganizations(currentUser.user_id);
+        if (userOrgsResult.success) {
+          setUserOrganizations(userOrgsResult.data || []);
+        }
+        
+        setJoinOrgOpen(false);
+        joinOrgForm.reset();
+      } else {
+        toast.error("Failed to join organization: " + result.error);
+      }
+    } catch (error) {
+      console.error("Error joining organization:", error);
+      toast.error("Failed to join organization");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Function to get organization type badge
+  const getOrgTypeBadge = (type) => {
+    switch(type) {
+      case 'admin_faculty':
+        return <Badge variant="destructive">Faculty/Admin</Badge>;
+      case 'official_student':
+        return <Badge variant="default" className="bg-grambling-gold text-black">Official Organization</Badge>;
+      case 'general':
+        return <Badge variant="outline">Club/Group</Badge>;
+      default:
+        return null;
     }
   };
 
@@ -171,6 +369,271 @@ export default function Profile() {
             </Card>
           </Link>
         </div>
+
+        {/* My Organizations */}
+        <section>
+          <div className="flex justify-between items-center mb-3">
+            <h2 className="text-lg font-semibold">My Organizations</h2>
+            <div className="flex gap-2">
+              <Dialog open={joinOrgOpen} onOpenChange={setJoinOrgOpen}>
+                <DialogTrigger asChild>
+                  <Button variant="outline" size="sm">
+                    <Users className="h-4 w-4 mr-1" />
+                    Join Existing
+                  </Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Join an Organization</DialogTitle>
+                    <DialogDescription>
+                      Select an organization to request membership
+                    </DialogDescription>
+                  </DialogHeader>
+
+                  <Form {...joinOrgForm}>
+                    <form onSubmit={joinOrgForm.handleSubmit(onJoinOrgSubmit)} className="space-y-4">
+                      <FormField
+                        control={joinOrgForm.control}
+                        name="organization_id"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Organization</FormLabel>
+                            <Select 
+                              onValueChange={field.onChange} 
+                              defaultValue={field.value}
+                            >
+                              <FormControl>
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Select an organization" />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                {allOrganizations.length === 0 ? (
+                                  <div className="p-2 text-center text-gray-500">
+                                    <p>No organizations available to join</p>
+                                  </div>
+                                ) : (
+                                  <>
+                                    <div className="p-2 text-xs text-gray-500 border-b">
+                                      Organizations must be verified by an admin before becoming fully active.
+                                    </div>
+                                    
+                                    {/* Get all orgs that user is not a member of */}
+                                    {allOrganizations
+                                      .filter(org => !userOrganizations.some(userOrg => 
+                                        userOrg.organization_id === org.id
+                                      ))
+                                      .map((org) => (
+                                        <SelectItem key={org.id} value={org.id}>
+                                          <div className="flex items-center gap-2">
+                                            <span>{org.name}</span> 
+                                            {getOrgTypeBadge(org.type)}
+                                            {!org.verified && (
+                                              <Badge variant="outline" className="ml-1 text-xs px-1 py-0 h-5 bg-yellow-50 text-yellow-800 border-yellow-200">
+                                                Pending
+                                              </Badge>
+                                            )}
+                                            {org.verified && (
+                                              <Badge variant="outline" className="ml-1 text-xs px-1 py-0 h-5 bg-green-50 text-green-800 border-green-200">
+                                                Verified
+                                              </Badge>
+                                            )}
+                                          </div>
+                                        </SelectItem>
+                                      ))}
+                                    
+                                    {/* Show a message if user is a member of all orgs */}
+                                    {allOrganizations.length > 0 && 
+                                     allOrganizations.filter(org => !userOrganizations.some(userOrg => 
+                                       userOrg.organization_id === org.id
+                                     )).length === 0 && (
+                                      <div className="p-2 text-center text-gray-500">
+                                        <p>You're already a member of all available organizations</p>
+                                      </div>
+                                    )}
+                                  </>
+                                )}
+                              </SelectContent>
+                            </Select>
+                            <FormDescription>
+                              Your request will need to be approved by an organization admin. If the organization is pending admin approval, you will need to wait for both approvals.
+                            </FormDescription>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <DialogFooter>
+                        <Button type="button" variant="outline" onClick={() => setJoinOrgOpen(false)}>
+                          Cancel
+                        </Button>
+                        <Button type="submit" disabled={isLoading}>
+                          {isLoading ? 'Submitting...' : 'Submit Request'}
+                        </Button>
+                      </DialogFooter>
+                    </form>
+                  </Form>
+                </DialogContent>
+              </Dialog>
+
+              <Dialog open={createOrgOpen} onOpenChange={setCreateOrgOpen}>
+                <DialogTrigger asChild>
+                  <Button size="sm" className="bg-grambling-gold text-black hover:bg-grambling-gold/90">
+                    <Plus className="h-4 w-4 mr-1" />
+                    Create New
+                  </Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Create New Organization</DialogTitle>
+                    <DialogDescription>
+                      Fill in the details to create a new campus organization
+                    </DialogDescription>
+                  </DialogHeader>
+
+                  <Form {...createOrgForm}>
+                    <form onSubmit={createOrgForm.handleSubmit(onCreateOrgSubmit)} className="space-y-4">
+                      <FormField
+                        control={createOrgForm.control}
+                        name="name"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Organization Name</FormLabel>
+                            <FormControl>
+                              <Input placeholder="Enter organization name" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={createOrgForm.control}
+                        name="type"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Organization Type</FormLabel>
+                            <Select 
+                              onValueChange={field.onChange} 
+                              defaultValue={field.value}
+                            >
+                              <FormControl>
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Select organization type" />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                <SelectItem value="admin_faculty">Faculty/Admin</SelectItem>
+                                <SelectItem value="official_student">Official Student Organization</SelectItem>
+                                <SelectItem value="general">Club/Group</SelectItem>
+                              </SelectContent>
+                            </Select>
+                            <FormDescription>
+                              Note: New organizations need to be verified by an admin
+                            </FormDescription>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={createOrgForm.control}
+                        name="description"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Description</FormLabel>
+                            <FormControl>
+                              <Textarea 
+                                placeholder="Enter organization description" 
+                                className="min-h-[100px]" 
+                                {...field} 
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <DialogFooter>
+                        <Button type="button" variant="outline" onClick={() => setCreateOrgOpen(false)}>
+                          Cancel
+                        </Button>
+                        <Button type="submit" disabled={isLoading}>
+                          {isLoading ? 'Creating...' : 'Create Organization'}
+                        </Button>
+                      </DialogFooter>
+                    </form>
+                  </Form>
+                </DialogContent>
+              </Dialog>
+            </div>
+          </div>
+
+          {userOrganizations.length > 0 ? (
+            <div className="space-y-3">
+              {userOrganizations.map((membership) => (
+                <Card key={membership.organization_id} className="tiger-card">
+                  <CardContent className="p-4">
+                    <div className="flex justify-between items-center">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <h3 className="font-semibold">{membership.organizations?.name}</h3>
+                          {getOrgTypeBadge(membership.organizations?.type)}
+                          {membership.role === 'admin' && (
+                            <Badge variant="secondary">Admin</Badge>
+                          )}
+                          {!membership.verified && (
+                            <Badge variant="outline" className="bg-orange-100 text-orange-800 border-orange-200">
+                              Pending Approval
+                            </Badge>
+                          )}
+                        </div>
+                        <p className="text-sm text-gray-500 mt-1 line-clamp-2">
+                          {membership.organizations?.description || "No description available"}
+                        </p>
+                        <div className="flex items-center mt-2 text-xs text-gray-500">
+                          <Building className="h-3 w-3 mr-1" />
+                          Status: {membership.organizations?.verified ? "Verified" : "Awaiting Verification"}
+                        </div>
+                      </div>
+                      <div>
+                        <Button variant="outline" size="sm">
+                          View Details
+                        </Button>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          ) : (
+            <Card className="tiger-card bg-gray-50">
+              <CardContent className="p-8 text-center">
+                <Users className="h-12 w-12 text-gray-300 mx-auto mb-3" />
+                <h3 className="text-lg font-medium text-gray-500 mb-2">
+                  No Organizations Yet
+                </h3>
+                <p className="text-sm text-gray-500 mb-4">
+                  Join existing organizations or create your own
+                </p>
+                <div className="flex gap-3 justify-center">
+                  <Button
+                    variant="outline"
+                    onClick={() => setJoinOrgOpen(true)}
+                  >
+                    Join Existing
+                  </Button>
+                  <Button
+                    className="bg-grambling-gold hover:bg-grambling-gold/90 text-grambling-black"
+                    onClick={() => setCreateOrgOpen(true)}
+                  >
+                    Create Organization
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+        </section>
 
         {/* My Listings */}
         <section>
@@ -301,6 +764,97 @@ export default function Profile() {
             </Card>
           )}
         </section>
+
+        {/* Render admin panel if user is an admin */}
+        {currentUser?.is_admin && (
+          <section className="mt-6">
+            <Card className="tiger-card">
+              <CardContent className="p-6">
+                <div className="flex justify-between items-center mb-4">
+                  <h2 className="text-xl font-bold">Admin Panel</h2>
+                  <Badge variant="destructive">Admin Access</Badge>
+                </div>
+                
+                <Tabs defaultValue="organizations">
+                  <TabsList className="mb-4">
+                    <TabsTrigger value="organizations">Pending Organizations</TabsTrigger>
+                    <TabsTrigger value="members">Member Requests</TabsTrigger>
+                  </TabsList>
+                  
+                  <TabsContent value="organizations" className="space-y-4">
+                    <div className="bg-yellow-50 p-3 rounded-md border border-yellow-200 mb-4">
+                      <p className="text-sm text-yellow-800">
+                        <InfoIcon className="h-4 w-4 inline mr-2" />
+                        New organizations require admin approval before they can be fully active.
+                      </p>
+                    </div>
+                    
+                    <AdminPendingOrganizations />
+                  </TabsContent>
+                  
+                  <TabsContent value="members" className="space-y-4">
+                    <div className="bg-yellow-50 p-3 rounded-md border border-yellow-200 mb-4">
+                      <p className="text-sm text-yellow-800">
+                        <InfoIcon className="h-4 w-4 inline mr-2" />
+                        You can approve member requests for organizations where you are an admin.
+                      </p>
+                    </div>
+                    
+                    <AdminPendingMembers />
+                  </TabsContent>
+                </Tabs>
+              </CardContent>
+            </Card>
+          </section>
+        )}
+
+        {/* Engineering Team Admin Access */}
+        {!currentUser?.is_admin && (
+          <Dialog>
+            <DialogTrigger asChild>
+              <Button 
+                variant="link" 
+                className="mt-6 w-full text-xs text-gray-400 hover:text-gray-600"
+              >
+                Engineering team access
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Engineering Team Verification</DialogTitle>
+                <DialogDescription>
+                  Enter your engineering team code to get admin access
+                </DialogDescription>
+              </DialogHeader>
+              
+              <form onSubmit={(e) => {
+                e.preventDefault();
+                const code = e.currentTarget.engineeringCode.value;
+                makeUserAdmin(code);
+              }}>
+                <div className="space-y-4 py-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="engineeringCode">Engineering Team Code</Label>
+                    <Input
+                      id="engineeringCode"
+                      name="engineeringCode"
+                      type="password"
+                      placeholder="Enter code"
+                      required
+                    />
+                    <p className="text-xs text-gray-500">
+                      This code is only available to the engineering team members
+                    </p>
+                  </div>
+                </div>
+                
+                <DialogFooter>
+                  <Button type="submit">Verify & Activate</Button>
+                </DialogFooter>
+              </form>
+            </DialogContent>
+          </Dialog>
+        )}
       </div>
     </AppLayout>
   );
