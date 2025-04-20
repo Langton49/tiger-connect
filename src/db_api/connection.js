@@ -336,7 +336,7 @@ class SupabaseDbConnection {
             
             // Combine and sort the messages
             const allMessages = [...sentMessages, ...receivedMessages].sort(
-                (a, b) => new Date(a.created_at) - new Date(b.created_at)
+                (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
             );
             
             return { success: true, messages: allMessages };
@@ -351,27 +351,47 @@ class SupabaseDbConnection {
             // Ensure ID is a string
             const currentUserIdStr = String(currentUserId);
             
-            console.log('Fetching conversations for user:', currentUserIdStr);
+            console.log('🔍 getConversations - Looking for conversations for user:', currentUserIdStr);
+            
+            // Debug: Check if the Messages table exists and has right structure
+            const { data: tableInfo, error: tableError } = await this.supabase
+                .from('Messages')
+                .select('count(*)', { count: 'exact' })
+                .limit(1);
+                
+            console.log('🔍 Messages table check:', { tableInfo, tableError });
             
             // Fetch all messages where currentUserId is sender
             const { data: sentMessages, error: sentError } = await this.supabase
                 .from("Messages")
-                .select("sender_id, receiver_id")
+                .select("sender_id, receiver_id, content, created_at")
                 .eq("sender_id", currentUserIdStr);
 
+            console.log('📤 Sent messages:', { 
+                count: sentMessages?.length || 0, 
+                messages: sentMessages,
+                error: sentError
+            });
+            
             if (sentError) {
-                console.error('Error fetching sent messages:', sentError.message);
+                console.error('❌ Error fetching sent messages:', sentError.message);
                 throw new Error(sentError.message);
             }
 
             // Fetch all messages where currentUserId is receiver
             const { data: receivedMessages, error: receivedError } = await this.supabase
                 .from("Messages")
-                .select("sender_id, receiver_id")
+                .select("sender_id, receiver_id, content, created_at")
                 .eq("receiver_id", currentUserIdStr);
 
+            console.log('📥 Received messages:', { 
+                count: receivedMessages?.length || 0, 
+                messages: receivedMessages,
+                error: receivedError
+            });
+            
             if (receivedError) {
-                console.error('Error fetching received messages:', receivedError.message);
+                console.error('❌ Error fetching received messages:', receivedError.message);
                 throw new Error(receivedError.message);
             }
 
@@ -389,25 +409,33 @@ class SupabaseDbConnection {
             });
 
             const uniqueIds = Array.from(partnerIds);
+            console.log('👥 Unique conversation partners found:', uniqueIds);
 
             if (uniqueIds.length === 0) {
+                console.log('ℹ️ No conversation partners found for user:', currentUserIdStr);
                 return { success: true, data: [] };
             }
 
             // Fetch their info from user_table
             const { data: users, error: userError } = await this.supabase
                 .from("user_table")
-                .select("user_id, first_name, last_name, email")
+                .select("user_id, first_name, last_name")
                 .in("user_id", uniqueIds);
 
+            console.log('👤 Conversation partners info:', { 
+                count: users?.length || 0, 
+                users,
+                error: userError
+            });
+            
             if (userError) {
-                console.error('Error fetching user info:', userError.message);
+                console.error('❌ Error fetching user info:', userError.message);
                 throw new Error(userError.message);
             }
 
             return { success: true, data: users };
         } catch (error) {
-            console.error('Unexpected error in getConversations:', error);
+            console.error('❌ Unexpected error in getConversations:', error);
             return { success: false, error: error.message };
         }
     }
