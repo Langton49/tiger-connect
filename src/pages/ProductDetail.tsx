@@ -138,9 +138,18 @@ const ProductDetail = () => {
 
                         <div>
                             <h3 className="font-semibold mb-2">Seller</h3>
-                            <p className="text-gray-600">
-                                {getSellerName(product.seller_id)}
-                            </p>
+                            <div className="flex items-center justify-between">
+                                <p className="text-gray-600">
+                                    {getSellerName(product.seller_id)}
+                                </p>
+                                <Button 
+                                    variant="link" 
+                                    className="text-grambling-gold p-0"
+                                    onClick={() => navigate(`/messages/${product.seller_id}`)}
+                                >
+                                    Message Seller
+                                </Button>
+                            </div>
                         </div>
 
                         <div>
