@@ -152,19 +152,24 @@ class SupabaseDbConnection {
     // Store url in the `images` column of the `marketplace_items` table
 
     async listItemsToMarketPlace(name, desc, price, seller_id, condition, category, images) {
+        let itemData = {
+            title: name,
+            description: desc,
+            price: price,
+            seller_id: seller_id,
+            condition: condition,
+            category: category,
+            status: "NA"
+        }
         try {
+            const stripeID = await this.getSellerStripeID(seller_id)
+            if (!stripeID.success) throw new Error(stripeID.error)
+            itemData.seller_stripe_id = stripeID.data.stripe_account_id
             const imageUrls = await this.uploadImagesToBucket(images, seller_id);
+            if (!imageUrls.success) throw new Error(imageUrls.error)
+            itemData.images = imageUrls.data
             const { data, error } = await this.supabase.from('marketplace_items')
-                .insert([{
-                    title: name,
-                    description: desc,
-                    price: price,
-                    seller_id: seller_id,
-                    condition: condition,
-                    category: category,
-                    images: imageUrls.data,
-                    status: "NA"
-                }])
+                .insert([itemData])
 
             if (error) throw new Error(error.message);
             return { success: true, data: data }
@@ -172,6 +177,20 @@ class SupabaseDbConnection {
             return { success: false, error: error.message }
         }
 
+    }
+
+    async getSellerStripeID(seller_id) {
+        try {
+            const { data, error } = await this.supabase.from('user_table')
+                .select('stripe_account_id')
+                .eq('user_id', seller_id)
+                .maybeSingle();
+
+            if (error) throw new Error(error.message);
+            return { success: true, data: data }
+        } catch (error) {
+            return { success: false, error: error.message }
+        }
     }
 
     async listServices(name, desc, rate, rateType, category, providerId, availability, image) {
@@ -289,21 +308,55 @@ class SupabaseDbConnection {
     // Get all messages between two users
     async getMessages(userA, userB) {
         try {
-        const { data, error } = await this.supabase
-            .from('messages')
-            .select('*')
-            .or(`and(sender_id.eq.${userA},receiver_id.eq.${userB}),and(sender_id.eq.${userB},receiver_id.eq.${userA})`)
-            .order('created_at', { ascending: true });
-    
-        if (error) {
-            return { success: false, error: error.message };
-        }
-    
-        return { success: true, messages: data };
+            const { data, error } = await this.supabase
+                .from('messages')
+                .select('*')
+                .or(`and(sender_id.eq.${userA},receiver_id.eq.${userB}),and(sender_id.eq.${userB},receiver_id.eq.${userA})`)
+                .order('created_at', { ascending: true });
+
+            if (error) {
+                return { success: false, error: error.message };
+            }
+
+            return { success: true, messages: data };
         } catch (err) {
-        return { success: false, error: "Unexpected error while fetching messages." };
+            return { success: false, error: "Unexpected error while fetching messages." };
         }
     }
+
+
+    // async createPaymentIntent(amount, formData) {
+    //     try {
+    //         const { data: paymentIntentData, error: intentError } =
+    //             await supabase.functions.invoke("create-payment-intent", {
+    //                 body: JSON.stringify({
+    //                     amount: Math.round(amount * 100),
+    //                     metadata: {
+    //                         customer_name: `${formData.firstName} ${formData.lastName}`,
+    //                         customer_email: formData.email,
+    //                         shipping_address: `${formData.address}, ${formData.city}, ${formData.state} ${formData.zipCode}`,
+    //                         items: JSON.stringify(
+    //                             items.map((item) => ({
+    //                                 id: item.item.id,
+    //                                 quantity: item.quantity,
+    //                             }))
+    //                         ),
+    //                     },
+    //                 }),
+    //             });
+
+    //         if (intentError || !paymentIntentData?.clientSecret) {
+    //             throw new Error(
+    //                 intentError?.message || "Failed to create payment intent"
+    //             );
+    //         }
+
+    //         return { success: true, data: paymentIntentData.clientSecret }
+    //     } catch (error) {
+    //         return { success: false, error: error.message }
+    //     }
+
+    // }
 
 }
 // Export the Supabase connection instance

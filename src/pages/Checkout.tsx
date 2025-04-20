@@ -8,7 +8,7 @@ import { useCart } from "@/contexts/CartContext";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@/components/ui/use-toast";
 import { CardElement, useStripe, useElements } from "@stripe/react-stripe-js";
-import axios from "axios";
+import { createClient } from "@supabase/supabase-js";
 
 interface FormData {
   firstName: string;
@@ -39,6 +39,11 @@ export default function Checkout() {
     cardName: "",
   });
 
+  const supabase = createClient(
+    import.meta.env.VITE_SUPABASE_URL,
+    import.meta.env.VITE_SUPABASE_KEY
+  );
+
   const handleInputChange = (
     e: React.ChangeEvent<HTMLInputElement>,
     field: keyof FormData
@@ -64,25 +69,32 @@ export default function Checkout() {
     setIsProcessing(true);
 
     try {
-      // Create payment intent on your backend
-      const {
-        data: { clientSecret },
-      } = await axios.post(
-        `${import.meta.env.VITE_API_URL}/create-payment-intent`,
-        {
-          amount: totalPrice * 100, // Convert to cents
-          metadata: {
-            customerName: `${formData.firstName} ${formData.lastName}`,
-            customerEmail: formData.email,
-            shippingAddress: `${formData.address}, ${formData.city}, ${formData.state} ${formData.zipCode}`,
-          },
-        }
-      );
+      const { data: paymentIntentData, error: intentError } =
+        await supabase.functions.invoke("create-payment-intent", {
+          body: JSON.stringify({
+            amount: Math.round(totalPrice * 100),
+            metadata: {
+              customer_name: `${formData.firstName} ${formData.lastName}`,
+              customer_email: formData.email,
+              shipping_address: `${formData.address}, ${formData.city}, ${formData.state} ${formData.zipCode}`,
+              items: JSON.stringify(
+                items.map((item) => ({
+                  id: item.item.id,
+                  quantity: item.quantity,
+                }))
+              ),
+            },
+          }),
+        });
 
-      // Confirm the payment with Stripe
-      const { error, paymentIntent } = await stripe.confirmCardPayment(
-        clientSecret,
-        {
+      if (intentError || !paymentIntentData?.clientSecret) {
+        throw new Error(
+          intentError?.message || "Failed to create payment intent"
+        );
+      }
+
+      const { error: confirmError, paymentIntent } =
+        await stripe.confirmCardPayment(paymentIntentData.clientSecret, {
           payment_method: {
             card: elements.getElement(CardElement)!,
             billing_details: {
@@ -93,39 +105,42 @@ export default function Checkout() {
                 city: formData.city,
                 state: formData.state,
                 postal_code: formData.zipCode,
+                country: "US",
               },
             },
           },
-        }
-      );
+        });
 
-      if (error) {
-        throw new Error(error.message);
+      if (confirmError) {
+        throw new Error(confirmError.message);
       }
 
-      if (paymentIntent.status === "succeeded") {
-        // Create order in your backend
-        await axios.post(`${import.meta.env.VITE_API_URL}/orders`, {
-          paymentIntentId: paymentIntent.id,
+      if (paymentIntent?.status === "succeeded") {
+        const { data: userData } = await supabase.auth.getUser();
+        const customerId = userData.user?.id || null;
+
+        const { error: orderError } = await supabase.from("orders").insert({
+          payment_intent_id: paymentIntent.id,
           amount: totalPrice,
-          items,
-          customerInfo: {
-            firstName: formData.firstName,
-            lastName: formData.lastName,
-            email: formData.email,
-            address: formData.address,
-            city: formData.city,
-            state: formData.state,
-            zipCode: formData.zipCode,
-          },
+          status: "processing",
+          user_id: customerId,
         });
+
+        if (orderError) {
+          console.error("Order creation error:", orderError);
+        }
 
         clearCart();
         toast({
           title: "Payment succeeded!",
           description: "Thank you for your purchase.",
         });
-        navigate("/order-success");
+        navigate("/order-success", {
+          state: {
+            paymentId: paymentIntent.id,
+            amount: totalPrice,
+          },
+        });
       }
     } catch (error) {
       console.error("Payment error:", error);
@@ -233,6 +248,16 @@ export default function Checkout() {
                   <h2 className="text-2xl font-bold mb-6">
                     Payment Information
                   </h2>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="cardName">Name on Card</Label>
+                    <Input
+                      id="cardName"
+                      value={formData.cardName}
+                      onChange={(e) => handleInputChange(e, "cardName")}
+                      required
+                    />
+                  </div>
 
                   <div className="space-y-2">
                     <Label>Card Details</Label>
