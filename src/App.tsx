@@ -31,6 +31,8 @@ import MessagesInbox from "./pages/MessagesInbox";
 import Notifications from "./pages/Notifications";
 import Search from "./pages/Search";
 import { loadStripe } from "@stripe/stripe-js";
+import SettingsPage from "./pages/Settings";
+import EditProfilePage from "./pages/ProfileEdit";
 
 const queryClient = new QueryClient();
 const stripePromise = loadStripe(import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY);
@@ -55,6 +57,14 @@ const App = () => (
                 <Route path="/events/new" element={<EventNew />} />
                 <Route path="/events/:id" element={<EventDetail />} />
                 <Route path="/profile" element={<Profile />} />
+                <Route
+                  path="/profile/settings"
+                  element={<SettingsPage />}
+                ></Route>
+                <Route
+                  path="/profile/edit"
+                  element={<EditProfilePage />}
+                ></Route>
                 <Route path="/search" element={<Search />} />
                 <Route path="/login" element={<Login />} />
                 <Route path="/register" element={<Register />} />
@@ -63,7 +73,10 @@ const App = () => (
                 <Route path="/cart" element={<Cart />} />
                 <Route path="/checkout" element={<Checkout />} />
                 <Route path="/order-success" element={<OrderSuccess />} />
-                <Route path="/messages/:receiverId" element={<MessagesPage />} />
+                <Route
+                  path="/messages/:receiverId"
+                  element={<MessagesPage />}
+                />
                 <Route path="/messages" element={<MessagesInbox />} />
                 <Route path="/notifications" element={<Notifications />} />
                 <Route path="*" element={<NotFound />} />

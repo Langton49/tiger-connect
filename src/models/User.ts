@@ -8,7 +8,7 @@ export interface User {
   g_number: string;
   verified: boolean;
   avatar?: string;
-  rating: number;
+  rating?: number;
   joinedAt: Date;
   bio?: string;
   is_admin?: boolean;

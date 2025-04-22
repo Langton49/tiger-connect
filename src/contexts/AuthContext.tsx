@@ -22,6 +22,7 @@ interface AuthContextType {
   logout: () => void;
   verifyAccount: () => Promise<boolean>;
   makeUserAdmin: (engineeringCode: string) => Promise<boolean>;
+  updateLocalUser: (updates: Partial<User>) => boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -199,7 +200,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const logout = async () => {
     const logoutResult = await supabaseCon.logout();
-    
+
     // Even if logout fails server-side, we'll clear locally for better UX
     setCurrentUser(null);
     setIsAuthenticated(false);
@@ -261,6 +262,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const updateLocalUser = (updates: Partial<User>) => {
+    console.log("Updating local user:", updates);
+    if (!currentUser) {
+      console.warn("Cannot update user - no current user");
+      return false;
+    }
+
+    try {
+      const updatedUser = { ...currentUser, ...updates };
+      setCurrentUser(updatedUser);
+      localStorage.setItem("tigerUser", JSON.stringify(updatedUser));
+      console.log(updatedUser);
+      return true;
+    } catch (error) {
+      console.error("Failed to update local user:", error);
+      return false;
+    }
+  };
+
   return (
     <AuthContext.Provider
       value={{
@@ -271,6 +291,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         logout,
         verifyAccount,
         makeUserAdmin,
+        updateLocalUser,
       }}
     >
       {children}

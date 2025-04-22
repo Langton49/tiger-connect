@@ -99,41 +99,58 @@ export default function ServicesNew() {
       }
 
       console.log("Service listing successful, data:", listingResult.data);
-      
+
       // Create notification for the new service
       try {
         // Get the service ID from the response
         let serviceId;
-        
-        if (Array.isArray(listingResult.data) && listingResult.data.length > 0) {
+
+        if (
+          Array.isArray(listingResult.data) &&
+          listingResult.data.length > 0
+        ) {
           serviceId = listingResult.data[0]?.id;
           console.log("Found service ID from array:", serviceId);
-        } else if (listingResult.data && typeof listingResult.data === 'object') {
+        } else if (
+          listingResult.data &&
+          typeof listingResult.data === "object"
+        ) {
           serviceId = listingResult.data.id;
           console.log("Found service ID from object:", serviceId);
         } else {
           console.log("Data returned:", JSON.stringify(listingResult.data));
         }
-          
+
         if (serviceId) {
-          console.log(`Creating notification for service ID: ${serviceId} and user ID: ${currentUser?.user_id}`);
-          const notificationResult = await supabaseCon.createNewServiceNotification(
-            currentUser?.user_id,
-            serviceId,
-            values.title
+          console.log(
+            `Creating notification for service ID: ${serviceId} and user ID: ${currentUser?.user_id}`
           );
-          
+          const notificationResult =
+            await supabaseCon.createNewServiceNotification(
+              currentUser?.user_id,
+              serviceId,
+              values.title
+            );
+
           if (notificationResult.success) {
             console.log("Service notification created successfully");
           } else {
-            console.error("Service notification creation failed:", notificationResult.error);
+            console.error(
+              "Service notification creation failed:",
+              notificationResult.error
+            );
           }
         } else {
-          console.warn("Service ID not found in response, skipping notification creation");
+          console.warn(
+            "Service ID not found in response, skipping notification creation"
+          );
         }
       } catch (notificationError) {
         // If notification creation fails, just log it but don't fail the whole operation
-        console.error("Error creating service notification:", notificationError);
+        console.error(
+          "Error creating service notification:",
+          notificationError
+        );
       }
 
       toast.success("Service listed successfully!");
@@ -141,7 +158,7 @@ export default function ServicesNew() {
       // Force a refresh of notifications before navigation
       try {
         // This will fire an event that the app-header listens for
-        const refreshEvent = new CustomEvent('refreshNotifications');
+        const refreshEvent = new CustomEvent("refreshNotifications");
         window.dispatchEvent(refreshEvent);
       } catch (e) {
         console.error("Failed to trigger notification refresh:", e);

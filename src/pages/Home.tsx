@@ -9,7 +9,7 @@ import {
   Calendar,
   Star,
   ArrowRight,
-  Loader2
+  Loader2,
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { supabaseCon } from "@/db_api/connection";
@@ -31,34 +31,42 @@ export default function Home() {
           // Format dates and get only upcoming events
           const now = new Date();
           const upcomingEvents = eventsData.data
-            .filter(event => new Date(event.date) >= now)
-            .map(event => ({
+            .filter((event) => new Date(event.date) >= now)
+            .map((event) => ({
               ...event,
               date: new Date(event.date),
-              created_at: new Date(event.created_at)
+              created_at: new Date(event.created_at),
             }))
             .sort((a, b) => a.date.getTime() - b.date.getTime()) // Sort by date ascending
             .slice(0, 2); // Get only the first 2
-            
+
           setFeaturedEvents(upcomingEvents);
         }
-        
+
         // Fetch marketplace listings
         const listingsData = await supabaseCon.getMarketPlaceListings();
         if (listingsData.success && listingsData.data) {
           // Get most recent listings
           const recentListings = listingsData.data
-            .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+            .sort(
+              (a, b) =>
+                new Date(b.created_at).getTime() -
+                new Date(a.created_at).getTime()
+            )
             .slice(0, 3);
           setFeaturedListings(recentListings);
         }
-        
+
         // Fetch services
         const servicesData = await supabaseCon.getServicesListings();
         if (servicesData.success && servicesData.data) {
           // Get most recent services
           const recentServices = servicesData.data
-            .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+            .sort(
+              (a, b) =>
+                new Date(b.created_at).getTime() -
+                new Date(a.created_at).getTime()
+            )
             .slice(0, 3);
           setFeaturedServices(recentServices);
         }
@@ -68,7 +76,7 @@ export default function Home() {
         setLoading(false);
       }
     };
-    
+
     fetchData();
   }, []);
 
@@ -76,7 +84,7 @@ export default function Home() {
   const formatEventDate = (date) => {
     return new Date(date).toLocaleDateString("en-US", {
       month: "short",
-      day: "numeric"
+      day: "numeric",
     });
   };
 
