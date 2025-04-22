@@ -89,7 +89,7 @@ export default function Register() {
     try {
       const success = await register(name, email, studentId, password);
       if (success) {
-        navigate("/verify");
+        navigate("/");
       }
     } catch (err) {
       console.error(err);
